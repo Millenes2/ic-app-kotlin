@@ -1,5 +1,6 @@
 package com.example.ic_app.auth
 
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ic_app.ui.theme.Ic_appTheme
 
+
 @Composable
 fun CriarConta(
     modifier: Modifier = Modifier,
@@ -28,7 +30,7 @@ fun CriarConta(
     var confirmarSenha by remember { mutableStateOf("") }
     var mensagemErro by remember { mutableStateOf("") }
 
-
+    val auth = FirebaseAuth.getInstance()
     val fundo = Color(0xFFFFF7FA)
     val rosa = Color(0xFFE91E63)
     val rosaClaro = Color(0xFFF8BBD0)
@@ -198,7 +200,14 @@ fun CriarConta(
                             mensagemErro = "As senhas não coincidem"
                         } else {
                             mensagemErro = ""
-                            onCadastrarClick()
+
+                            auth.createUserWithEmailAndPassword(email, senha)
+                                .addOnSuccessListener {
+                                    onCadastrarClick()
+                                }
+                                .addOnFailureListener { erro ->
+                                    mensagemErro = erro.message ?: "Erro ao criar conta"
+                                }
                         }
                     },
                     modifier = Modifier

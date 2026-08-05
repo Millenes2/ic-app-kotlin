@@ -280,6 +280,9 @@ fun AppScreen() {
                 },
                 onRelatoriosClick = {
                     telaAtual = "relatorios"
+                },
+                onLoginClick = {
+                    telaAtual = "login"
                 }
             )
 

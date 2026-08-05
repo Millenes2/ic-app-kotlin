@@ -31,19 +31,15 @@ fun HomeScreen(
     onChatClick: () -> Unit,
     onCalendarioClick: () -> Unit,
     onPerfilClick: () -> Unit,
-    onRelatoriosClick: () -> Unit = {}
+    onRelatoriosClick: () -> Unit = {},
+    onLoginClick: () -> Unit
 ) {
     val fundo = Color(0xFFFBF9FB)
     val primary = Color(0xFFD86C9E)
     val lavender = Color(0xFFFCEAF2)
-    val rosaClaro = Color(0xFFFFF0F5)
     val surfaceLow = Color(0xFFF5F3F5)
     val textoPrincipal = Color(0xFF1B1C1D)
     val textoSecundario = Color(0xFF6F6F6F)
-
-    // adicionar relatorios
-    // histórico
-    //melhorar calendario
 
     val saudacao = saudacaoPorHorario()
 
@@ -88,7 +84,6 @@ fun HomeScreen(
             CyclePremiumCard(
                 primary = primary,
                 surfaceLow = surfaceLow,
-                textoPrincipal = textoPrincipal,
                 textoSecundario = textoSecundario,
                 onClick = onCalendarioClick
             )
@@ -98,7 +93,6 @@ fun HomeScreen(
             LuneteCard(
                 primary = primary,
                 lavender = lavender,
-                rosaClaro = rosaClaro,
                 textoPrincipal = textoPrincipal,
                 textoSecundario = textoSecundario,
                 onClick = onChatClick
@@ -123,12 +117,64 @@ fun HomeScreen(
             AiInsightCard(
                 primary = primary,
                 surfaceLow = surfaceLow,
-                textoPrincipal = textoPrincipal,
                 textoSecundario = textoSecundario,
                 onClick = onChatClick
             )
 
+            Spacer(modifier = Modifier.height(22.dp))
+
+            LoginCard(
+                primary = primary,
+                textoPrincipal = textoPrincipal,
+                textoSecundario = textoSecundario,
+                onLoginClick = onLoginClick
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun LoginCard(
+    primary: Color,
+    textoPrincipal: Color,
+    textoSecundario: Color,
+    onLoginClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = "Salve seus dados",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = textoPrincipal
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Entre na sua conta para manter seu histórico, registros e conversas com a Lunete.",
+                fontSize = 14.sp,
+                color = textoSecundario,
+                lineHeight = 20.sp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+                onClick = onLoginClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = primary)
+            ) {
+                Text("Fazer login", color = Color.White)
+            }
         }
     }
 }
@@ -148,20 +194,15 @@ fun HomeTopBar(
             modifier = Modifier
                 .size(52.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE7DEFF)),
+                .background(Color(0xFFFCEAF2)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "🌙",
-                fontSize = 25.sp
-            )
+            Text(text = "🌙", fontSize = 25.sp)
         }
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "$saudacao, $nomeUsuario 👋",
                 color = primary,
@@ -186,10 +227,7 @@ fun HomeTopBar(
                 .background(Color(0xFFF5F3F5)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "🔔",
-                fontSize = 20.sp
-            )
+            Text(text = "🔔", fontSize = 20.sp)
         }
     }
 }
@@ -209,14 +247,14 @@ fun HealthChips(
         HealthChip(
             dotColor = primary,
             text = "Humor: Estável",
-            background = Color(0xFFE7DEFF),
-            textColor = Color(0xFF4A4168)
+            background = Color(0xFFFFEEF5),
+            textColor = Color(0xFF8A4A68)
         )
 
         HealthChip(
             dotColor = Color(0xFF74696D),
             text = "Energia: Média",
-            background = Color(0xFFF3E5EA),
+            background = Color(0xFFFCEAF2),
             textColor = Color(0xFF5B5155)
         )
 
@@ -265,7 +303,6 @@ fun HealthChip(
 fun CyclePremiumCard(
     primary: Color,
     surfaceLow: Color,
-    textoPrincipal: Color,
     textoSecundario: Color,
     onClick: () -> Unit
 ) {
@@ -297,9 +334,7 @@ fun CyclePremiumCard(
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "SEU CICLO",
                             color = textoSecundario,
@@ -348,7 +383,6 @@ fun CyclePremiumCard(
 fun LuneteCard(
     primary: Color,
     lavender: Color,
-    rosaClaro: Color,
     textoPrincipal: Color,
     textoSecundario: Color,
     onClick: () -> Unit
@@ -359,9 +393,7 @@ fun LuneteCard(
         colors = CardDefaults.cardColors(containerColor = lavender),
         elevation = CardDefaults.cardElevation(3.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp)
-        ) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50.dp))
@@ -405,9 +437,7 @@ fun LuneteCard(
                     .fillMaxWidth()
                     .height(54.dp),
                 shape = RoundedCornerShape(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primary
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = primary)
             ) {
                 Text(
                     text = "Conversar com a IA",
@@ -442,24 +472,22 @@ fun QuickAccessSection(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            QuickAccessItem("📅", "Ciclo", primary, surfaceLow, textoPrincipal, Modifier.weight(1f), onCicloClick)
-            QuickAccessItem("🩺", "Sintomas", primary, surfaceLow, textoPrincipal, Modifier.weight(1f), onSintomasClick)
-            QuickAccessItem("😊", "Humor", primary, surfaceLow, textoPrincipal, Modifier.weight(1f), onHumorClick)
+            QuickAccessItem("📅", "Ciclo", surfaceLow, textoPrincipal, Modifier.weight(1f), onCicloClick)
+            QuickAccessItem("🩺", "Sintomas", surfaceLow, textoPrincipal, Modifier.weight(1f), onSintomasClick)
+            QuickAccessItem("😊", "Humor", surfaceLow, textoPrincipal, Modifier.weight(1f), onHumorClick)
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            QuickAccessItem("📊", "Relatórios", primary, surfaceLow, textoPrincipal, Modifier.weight(1f), onRelatoriosClick)
-            QuickAccessItem("🕘", "Histórico", primary, surfaceLow, textoPrincipal, Modifier.weight(1f), onHistoricoClick)
+            QuickAccessItem("📊", "Relatórios", surfaceLow, textoPrincipal, Modifier.weight(1f), onRelatoriosClick)
+            QuickAccessItem("🕘", "Histórico", surfaceLow, textoPrincipal, Modifier.weight(1f), onHistoricoClick)
         }
     }
 }
@@ -468,7 +496,6 @@ fun QuickAccessSection(
 fun QuickAccessItem(
     emoji: String,
     title: String,
-    primary: Color,
     background: Color,
     textoPrincipal: Color,
     modifier: Modifier = Modifier,
@@ -496,10 +523,7 @@ fun QuickAccessItem(
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = emoji,
-                    fontSize = 19.sp
-                )
+                Text(text = emoji, fontSize = 19.sp)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -519,7 +543,6 @@ fun QuickAccessItem(
 fun AiInsightCard(
     primary: Color,
     surfaceLow: Color,
-    textoPrincipal: Color,
     textoSecundario: Color,
     onClick: () -> Unit
 ) {
@@ -555,12 +578,8 @@ fun AiInsightCard(
         colors = CardDefaults.cardColors(containerColor = surfaceLow),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
@@ -626,7 +645,7 @@ fun LunaPremiumBottomBar(
             colors = NavigationBarItemDefaults.colors(
                 selectedTextColor = primary,
                 selectedIconColor = primary,
-                indicatorColor = Color(0xFFE7DEFF)
+                indicatorColor = Color(0xFFFFEEF5)
             )
         )
 
@@ -681,7 +700,8 @@ fun HomeScreenPreview() {
             onChatClick = {},
             onCalendarioClick = {},
             onPerfilClick = {},
-            onRelatoriosClick = {}
+            onRelatoriosClick = {},
+            onLoginClick = {}
         )
     }
 }
