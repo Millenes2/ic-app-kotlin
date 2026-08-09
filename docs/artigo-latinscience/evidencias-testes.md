@@ -484,3 +484,113 @@ Em Linux/macOS o `uvloop` é instalado normalmente; em Windows é ignorado pelo 
 | Commits ou push realizados | **não** |
 | `backend/luna.db` criado | não — suíte roda em SQLite em memória |
 | `backend/.venv` / `.pytest_cache` versionados | não — ignorados por `backend/.gitignore` |
+
+---
+
+# 9. Cobertura de código (`pytest-cov`)
+
+- **Data:** 2026-08-09
+- **Branch:** `develop` · **Commit base:** `8baeff7`
+- **Objetivo:** medir a métrica que a seção 6 registrava como ausente ("`pytest-cov` não está em
+  `backend/requirements.txt`; nenhuma métrica de cobertura foi medida").
+
+## 9.1 Instalação
+
+`pytest-cov` não estava instalado nem declarado. Instalado no `.venv` já existente:
+
+```bash
+.venv/Scripts/python.exe -m pip install pytest-cov
+```
+
+```
+Successfully installed coverage-7.15.4 pytest-cov-7.1.0
+```
+
+## 9.2 Comando executado
+
+```bash
+.venv/Scripts/python.exe -m pytest --cov=app --cov-report=term-missing -v
+```
+
+## 9.3 Resultado consolidado
+
+```
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.13.3-final-0 _______________
+TOTAL                                 700     43    94%
+================ 146 passed, 124 warnings in 117.42s (0:01:57) ================
+```
+
+| Métrica | Valor |
+|---|---:|
+| Testes aprovados | **146** (inalterado) |
+| Linhas de código (`app/`) | 700 |
+| Linhas não cobertas | 43 |
+| **Cobertura total** | **94 %** |
+
+## 9.4 Cobertura por módulo
+
+| Arquivo | Statements | Miss | Cobertura | Linhas não cobertas |
+|---|---:|---:|---:|---|
+| `app/db/session.py` | 11 | 4 | 64 % | 15–19 |
+| `app/dependencies.py` | 21 | 2 | 90 % | 34, 40 |
+| `app/main.py` | 18 | 1 | 94 % | 86 |
+| `app/routers/auth.py` | 35 | 3 | 91 % | 46–52 |
+| `app/routers/consentimentos.py` | 42 | 8 | 81 % | 74–92 |
+| `app/routers/registros_ciclo.py` | 71 | 7 | 90 % | 56–62 |
+| `app/routers/registros_diarios.py` | 77 | 7 | 91 % | 56–62 |
+| `app/routers/respostas_objetivo.py` | 43 | 8 | 81 % | 67–85 |
+| `app/schemas/registro_ciclo.py` | 61 | 2 | 97 % | 29, 80 |
+| `app/schemas/usuario.py` | 61 | 1 | 98 % | 114 |
+| Demais 20 arquivos (models, schemas restantes, `core/`, `db/base.py`) | — | 0 | **100 %** | — |
+
+## 9.5 Análise das lacunas
+
+As 43 linhas não cobertas se concentram em três categorias, todas explicáveis pela natureza do
+código, não por ausência de teste correspondente:
+
+**(a) `get_db()` real nunca é executado (`app/db/session.py`, linhas 15–19).**
+`backend/tests/conftest.py` substitui essa dependência inteira via `dependency_overrides` por uma
+versão que usa SQLite em memória. O gerador de produção (que abre uma sessão contra o banco
+configurado em `DATABASE_URL` e a fecha no `finally`) nunca chega a rodar sob teste — é o
+comportamento esperado de uma suíte que isola o banco real.
+
+**(b) Cinco tratamentos de corrida de `IntegrityError`, idênticos em padrão** — `auth.py:46-52`,
+`consentimentos.py:74-92`, `respostas_objetivo.py:67-85`, `registros_ciclo.py:56-62`,
+`registros_diarios.py:56-62`. Cada um trata o caso de duas requisições concorrentes tentando criar
+o mesmo registro (mesmo e-mail, mesma data, mesma combinação de chaves de negócio): a requisição
+que perde a corrida do `commit()` cai nesse bloco, faz `rollback()` e responde 409 em vez de deixar
+propagar um 500. Um `TestClient` síncrono processa uma requisição de cada vez, então não há como
+duas baterem no `commit()` simultaneamente nesse tipo de teste — cobrir esse ramo exigiria
+infraestrutura de concorrência real (threads ou processos disparando requisições ao mesmo tempo),
+fora do escopo desta suíte.
+
+**(c) Ramos de borda de baixo impacto** — `dependencies.py:34,40` (token com payload sem `sub`, ou
+usuário apagado entre a emissão do token e o uso), `main.py:86` (o corpo de `GET /` nunca é
+chamado por um teste HTTP real — só `GET /health` tem teste dedicado), e duas linhas de validação
+em `schemas/registro_ciclo.py` e `schemas/usuario.py`.
+
+**Leitura:** a suíte cobre integralmente a lógica de negócio síncrona — modelos, schemas,
+validações e o fluxo de erro tratável em uma única requisição. A lacuna de 6 % é concentrada,
+explicada linha a linha, e não indica ausência de teste para comportamento alcançável em produção
+por uma requisição isolada.
+
+## 9.6 Aumento de avisos (1 → 124)
+
+A execução com `--cov` reportou 124 avisos (`ResourceWarning: unclosed database in <sqlite3.Connection ...>`),
+contra o único aviso do Starlette registrado nas seções 3.4 e 8.5. A causa não é o `pytest-cov` em
+si: o plugin aciona `gc.collect()` durante a coleta de cobertura, o que expõe conexões SQLite que já
+não eram fechadas explicitamente antes (visíveis agora, não introduzidas agora). Não afeta o
+resultado — os 146 testes continuam passando — e fica registrado aqui como um achado a
+investigar separadamente (fechamento explícito de conexão nas fixtures de teste), não como
+regressão desta medição.
+
+## 9.7 Verificações de integridade
+
+| Verificação | Resultado |
+|---|---|
+| Arquivos alterados | `backend/requirements.txt` (2 linhas: `coverage`, `pytest-cov`) |
+| `requirements.txt` da raiz alterado | **não** — não contém `pytest` nem nenhuma dependência de teste; adicionar `pytest-cov` isoladamente ali criaria inconsistência nova |
+| Código-fonte do backend alterado | não |
+| Resultado dos 146 testes | inalterado (146 passed) |
+| Commits ou push realizados | não |
