@@ -1,6 +1,5 @@
 package com.example.ic_app.auth
 
-import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,22 +14,34 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.AuthUiState
+import com.example.ic_app.viewmodel.AuthViewModel
 
 
 @Composable
 fun CriarConta(
     modifier: Modifier = Modifier,
     onCadastrarClick: () -> Unit,
-    onVoltarClick: () -> Unit
+    onVoltarClick: () -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
     var nome by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var confirmarSenha by remember { mutableStateOf("") }
     var mensagemErro by remember { mutableStateOf("") }
+    val estado by viewModel.estado.collectAsState()
 
-    val auth = FirebaseAuth.getInstance()
+    LaunchedEffect(estado) {
+        when (val estadoAtual = estado) {
+            is AuthUiState.Sucesso -> onCadastrarClick()
+            is AuthUiState.Erro -> mensagemErro = estadoAtual.mensagem
+            else -> {}
+        }
+    }
+
     val fundo = Color(0xFFFFF7FA)
     val rosa = Color(0xFFE91E63)
     val rosaClaro = Color(0xFFF8BBD0)
@@ -200,16 +211,10 @@ fun CriarConta(
                             mensagemErro = "As senhas não coincidem"
                         } else {
                             mensagemErro = ""
-
-                            auth.createUserWithEmailAndPassword(email, senha)
-                                .addOnSuccessListener {
-                                    onCadastrarClick()
-                                }
-                                .addOnFailureListener { erro ->
-                                    mensagemErro = erro.message ?: "Erro ao criar conta"
-                                }
+                            viewModel.registrar(email, senha, nome)
                         }
                     },
+                    enabled = estado != AuthUiState.Carregando,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp),
@@ -219,12 +224,19 @@ fun CriarConta(
                         containerColor = rosa
                     )
                 ) {
-                    Text(
-                        text = "Criar conta",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    ) //criar um botão para voltar para home
+                    if (estado == AuthUiState.Carregando) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.height(20.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "Criar conta",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

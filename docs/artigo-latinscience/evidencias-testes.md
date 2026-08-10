@@ -594,3 +594,148 @@ regressão desta medição.
 | Código-fonte do backend alterado | não |
 | Resultado dos 146 testes | inalterado (146 passed) |
 | Commits ou push realizados | não |
+
+---
+
+# 10. Integração mínima Android ↔ FastAPI
+
+- **Data:** 2026-08-09/10
+- **Branch:** `develop` · **Commit base:** `3cd0f11`
+- **Objetivo:** conectar `LoginScreen` e `CriarConta` (Android) a `POST /auth/login` e
+  `POST /auth/registrar` (backend), substituindo em `CriarConta` a chamada ao `FirebaseAuth` pela
+  chamada ao backend próprio — decisão de arquitetura registrada nas seções 12–13 do `CLAUDE.md`,
+  autorizada explicitamente nesta etapa.
+
+> ⚠️ **Restrição de ambiente, verificada por investigação direta nesta máquina:** não há Java,
+> Android SDK, Android Studio nem emulador instalados (`java`, `ANDROID_HOME`,
+> `Program Files\Android Studio` — todos ausentes). Como consequência, **esta seção documenta
+> duas evidências de natureza diferente**, e elas não devem ser confundidas: a verificação do
+> backend (10.1) é execução real, com resultado observado; o código Android (10.2) é código
+> escrito e revisado por leitura, **não compilado nem executado nesta máquina**. A verificação
+> real do app — `./gradlew assembleDebug`, instalação no emulador/dispositivo, teste manual —
+> está pendente e será feita na máquina da UFU.
+
+## 10.1 Backend: verificação ponta a ponta com HTTP real (executado e observado)
+
+Diferente da suíte `pytest` (que usa `TestClient` in-process, sem sockets de rede) e diferente da
+seção 8.3 (que testa só a instalação), este teste sobe o `uvicorn` de verdade e faz requisições
+HTTP reais — o mesmo caminho que o app Android vai exercitar na UFU.
+
+### Achado antes da verificação: banco sem schema
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+respondeu `200` em `GET /` e `GET /health`, mas a primeira chamada real de negócio
+(`POST /auth/registrar`) devolveu **500**, com o traceback terminando em:
+```
+sqlite3.OperationalError: no such table: usuario
+```
+
+**Causa:** a suíte `pytest` nunca precisa de migrations — `tests/conftest.py` cria as tabelas via
+`Base.metadata.create_all()` num SQLite em memória a cada teste. Rodar a aplicação "de verdade"
+contra um `luna.db` em arquivo, pela primeira vez, não passa por esse atalho: o schema só existe
+depois de `alembic upgrade head`. Isso nunca apareceu nos 146 testes nem nas seções 1–9 porque
+nenhuma delas sobe o servidor de fato.
+
+**Correção:** rodar as migrations pendentes (procedimento já documentado no `CLAUDE.md`, seção 7 —
+não é uma alteração de código, só um passo de setup que faltou):
+```bash
+.venv/Scripts/python.exe -m alembic upgrade head
+```
+Criou as 5 tabelas de negócio + `alembic_version`. Nenhum arquivo de código foi alterado para essa
+correção.
+
+**Leitura para o artigo:** este é um achado genuíno da etapa de integração — uma lacuna real entre
+"os testes passam" e "a aplicação roda", que só aparece ao operar o sistema fora do arnês de
+teste. Vale registrar como achado, não esconder.
+
+### Sequência executada (após as migrations), contra `http://127.0.0.1:8000`
+
+| # | Requisição | Esperado | Obtido |
+|---|---|---|---|
+| 1 | `POST /auth/registrar` (e-mail novo) | 201 | **201**, `UsuarioOut` completo, `senha_hash` ausente |
+| 2 | `POST /auth/registrar` (mesmo e-mail) | 409 | **409**, `{"detail":"Já existe uma conta com este e-mail"}` |
+| 3 | `POST /auth/login` (senha certa) | 200 | **200**, `access_token` presente, `token_type":"bearer"` |
+| 4 | `POST /auth/login` (senha errada) | 401 | **401**, `{"detail":"E-mail ou senha inválidos"}` |
+| 5 | `GET /auth/me` (com token) | 200 | **200**, `email` correspondente |
+| 6 | `GET /auth/me` (sem header) | 401 | **401**, `{"detail":"Not authenticated"}` |
+| 7 | `GET /` | 200 | **200**, `{"mensagem":"Bem-vindo à API do Luna!"}` |
+| 8 | `GET /health` | 200 | **200**, `{"status":"ok"}` |
+
+Todos os 8 resultados bateram com o contrato documentado em `backend/app/routers/auth.py` e com
+os testes já existentes em `backend/tests/test_auth.py` — nenhuma divergência de comportamento
+entre `TestClient` e HTTP real, fora do achado do schema acima.
+
+### Limpeza após o teste
+
+Servidor encerrado; `backend/luna.db` (gerado só para este teste manual) removido — já é ignorado
+por `backend/.gitignore:4` (`*.db`), não haveria risco de commit acidental mesmo sem a remoção.
+`git status` confirmado limpo antes de seguir.
+
+## 10.2 Android: código escrito, revisado por leitura — não compilado nesta máquina
+
+Escopo: `LoginScreen` e `CriarConta` passam a chamar o backend via Retrofit, com um `ViewModel`
+único de autenticação e o token salvo em DataStore. Nenhuma outra tela foi tocada; `AppScreen.kt`
+não mudou (os branches `"login"`/`"criar"` continuam com a mesma assinatura de callback).
+
+### Arquivos novos
+- `app/src/main/java/com/example/ic_app/data/remote/dto/AuthDtos.kt` — DTOs espelhando
+  `UsuarioCreate`, `LoginRequest`, `Token`, `UsuarioOut` do backend.
+- `app/src/main/java/com/example/ic_app/data/remote/AuthApi.kt` — interface Retrofit
+  (`POST auth/registrar`, `POST auth/login`).
+- `app/src/main/java/com/example/ic_app/data/remote/RetrofitClient.kt` — cliente HTTP,
+  `BASE_URL = "http://10.0.2.2:8000/"` (endereço do host visto de dentro do emulador Android).
+- `app/src/main/java/com/example/ic_app/data/local/SessaoDataStore.kt` — DataStore de
+  preferências para o token de sessão (único estado persistente novo do app).
+- `app/src/main/java/com/example/ic_app/viewmodel/AuthViewModel.kt` — `AuthUiState`
+  (`Idle`/`Carregando`/`Sucesso`/`Erro`), funções `login`/`registrar`; `registrar` encadeia um
+  login automático (o endpoint de registro não devolve token).
+- `app/src/main/res/xml/network_security_config.xml` — libera cleartext (HTTP) apenas para
+  `10.0.2.2`/`localhost`/`127.0.0.1`, não globalmente (`targetSdk=36` bloqueia HTTP por padrão).
+
+### Arquivos alterados
+- `gradle/libs.versions.toml`, `app/build.gradle.kts` — dependências novas: Retrofit +
+  converter-gson, OkHttp logging interceptor, `kotlinx-coroutines-android`,
+  `datastore-preferences`, `lifecycle-viewmodel-compose`. Nenhuma dependência existente foi
+  removida ou teve versão alterada; Firebase (`firebase-auth`, `firebase-firestore`) permanece
+  declarado.
+- `app/src/main/AndroidManifest.xml` — `<uses-permission android:name="android.permission.INTERNET" />`
+  (ausente antes) e `android:networkSecurityConfig` apontando para o XML acima.
+- `app/src/main/java/com/example/ic_app/auth/LoginScreen.kt` — o botão "Entrar" agora chama
+  `viewModel.login(email, senha)` em vez de avançar sem verificar nada; adicionado indicador de
+  carregamento e desabilitação do botão durante a chamada. Validação de campo vazio já existente
+  preservada sem alteração.
+- `app/src/main/java/com/example/ic_app/auth/CriarConta.kt` — removida a única referência a
+  `FirebaseAuth` do arquivo (`import` e `FirebaseAuth.getInstance()`); o botão "Criar conta" agora
+  chama `viewModel.registrar(email, senha, nome)`. As 6 validações client-side existentes
+  (nome/e-mail/senha vazios, confirmação de senha, tamanho mínimo) foram preservadas sem alteração.
+  **A dependência Firebase em si não foi removida** — só a chamada deste arquivo mudou de alvo.
+
+### O que este código NÃO prova
+
+- Não prova que o app compila (`./gradlew assembleDebug` nunca rodou nesta sessão).
+- Não prova que a tela renderiza, que o clique funciona, ou que o token é de fato salvo e
+  reaproveitado — nada disso pode ser observado sem emulador/dispositivo.
+- Não prova que `10.0.2.2` alcança o backend de um emulador real (a seção 10.1 prova que o
+  backend responde por HTTP; não prova que o Android o alcança).
+- Revisão feita foi: leitura linha a linha das quatro telas/camadas afetadas, verificação manual
+  de que os nomes de campo dos DTOs batem com os schemas Pydantic (seção 2 desta etapa, contrato
+  em `backend/app/schemas/`), e verificação de que a assinatura de `LoginScreen`/`CriarConta`
+  manteve compatibilidade com as chamadas existentes em `AppScreen.kt`.
+
+**Próximo passo, na UFU:** `./gradlew assembleDebug`, resolver eventuais erros de compilação,
+subir o backend na mesma rede do emulador (ou `adb reverse tcp:8000 tcp:8000` para dispositivo
+físico), e repetir manualmente a sequência de login/cadastro descrita em 10.1 através da
+interface real — essa é a etapa 4 do roteiro do artigo (teste ponta a ponta).
+
+## 10.3 Verificações de integridade
+
+| Verificação | Resultado |
+|---|---|
+| Backend: 8 requisições HTTP reais | executadas e observadas nesta máquina (seção 10.1) |
+| Android: compilado/executado nesta máquina | **não** — sem toolchain disponível; código pendente de verificação na UFU |
+| `AppScreen.kt` alterado | não |
+| Dependências Firebase removidas | não — só a chamada em `CriarConta.kt` mudou de alvo |
+| `backend/luna.db` de teste removido | sim, antes de qualquer commit |
+| Commits ou push realizados | não |

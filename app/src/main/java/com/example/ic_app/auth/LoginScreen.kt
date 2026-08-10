@@ -15,11 +15,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,17 +36,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.AuthUiState
+import com.example.ic_app.viewmodel.AuthViewModel
 
 @Composable
 fun LoginScreen(
     modifier: Modifier = Modifier,
     onEntrarClick: () -> Unit,
-    onCriarContaClick: () -> Unit
+    onCriarContaClick: () -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var mensagemErro by remember { mutableStateOf("") }
+    val estado by viewModel.estado.collectAsState()
+
+    LaunchedEffect(estado) {
+        when (val estadoAtual = estado) {
+            is AuthUiState.Sucesso -> onEntrarClick()
+            is AuthUiState.Erro -> mensagemErro = estadoAtual.mensagem
+            else -> {}
+        }
+    }
 
     val fundo = Color(0xFFFFF7FA)
     val rosa = Color(0xFFE91E63)
@@ -200,9 +216,10 @@ fun LoginScreen(
                             mensagemErro = "Preencha a senha"
                         } else {
                             mensagemErro = ""
-                            onEntrarClick()
+                            viewModel.login(email, senha)
                         }
                     },
+                    enabled = estado != AuthUiState.Carregando,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp),
@@ -212,12 +229,19 @@ fun LoginScreen(
                         containerColor = rosa
                     )
                 ) {
-                    Text(
-                        text = "Entrar",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    )
+                    if (estado == AuthUiState.Carregando) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.height(20.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "Entrar",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
