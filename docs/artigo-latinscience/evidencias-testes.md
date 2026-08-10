@@ -739,3 +739,134 @@ interface real — essa é a etapa 4 do roteiro do artigo (teste ponta a ponta).
 | Dependências Firebase removidas | não — só a chamada em `CriarConta.kt` mudou de alvo |
 | `backend/luna.db` de teste removido | sim, antes de qualquer commit |
 | Commits ou push realizados | não |
+
+---
+
+# 11. Primeiro build Android real + evidências de `/auth/me` e registros diários
+
+- **Data:** 2026-08-10
+- **Máquina:** terceira máquina distinta das anteriores (identificada aqui como "máquina do
+  escritório", caminho `C:\Users\ZARRO ADV\ic-app-kotlin`) — **não** é a máquina "Mille" das
+  seções 1–10 nem a "máquina da UFU" citada em `instrucoes-build-ufu.md`. No início desta sessão
+  não havia JDK, Android SDK, Android Studio nem `local.properties`; tudo foi instalado durante
+  esta etapa.
+- **Branch:** `develop` · **Commits desta etapa:** `b61a3dd` (versões de build) e `e3b51ab`
+  (código de `/auth/me` e integração de `RegistrarHojeScreen`) — ambos enviados ao `origin`.
+- **Objetivo:** destravar a compilação real do app (bloqueada por incompatibilidades de versão) e
+  produzir o código/evidências que faltavam para a autenticação e a fatia
+  `RegistrarHojeScreen → POST → persistência → GET`.
+
+## 11.1 Nota de segurança verificada (sem incidente novo)
+
+`instrucoes-build-ufu.md`, seção 0, registra que a máquina "Mille" teve um commit
+(`8068aba`, "sem janatar") com `backend/.env`/`SECRET_KEY` vazado, enviado ao GitHub, com
+remediação (Fase 6) descrita como pendente. Verificação feita nesta etapa, antes de qualquer
+`push`:
+
+```bash
+git cat-file -t 8068aba        # fatal: Not a valid object name
+git log --all --oneline -- backend/.env   # vazio
+```
+
+O commit equivalente nesta máquina (`612eb63`, mesma mensagem "sem janatar") tem **hash
+diferente** de `8068aba` — evidência de que o histórico já havia sido reescrito/limpo no GitHub
+antes deste clone existir. `backend/.env` nunca esteve rastreado no histórico atual. Os dois
+commits desta etapa (`b61a3dd`, `e3b51ab`) foram construídos e enviados sobre esse histórico já
+limpo — sem reintrodução do vazamento.
+
+## 11.2 Correção de ambiente: `gradle-daemon-jvm.properties` fixando JDK 21
+
+Arquivo pré-existente e já commitado (não criado nesta sessão) continha
+`toolchainVersion=21` (feature "Daemon JVM criteria" do Gradle), forçando o daemon a exigir JDK 21
+via auto-provisionamento (foojay), independente do `JAVA_HOME`. Nenhum outro arquivo do projeto
+declarava bloco de toolchain — a configuração não era necessária. **Removido** (não regenerado
+para JDK 17, para evitar depender de rede/Gradle antes da autorização), desbloqueando o build com
+o JDK 17 real (JBR do Android Studio).
+
+## 11.3 Alinhamento de versões (matriz conservadora)
+
+| Componente | Antes | Depois |
+|---|---|---|
+| Gradle | 9.3.1 (incompatível com AGP 8.7.2) | **8.11.1** |
+| AGP | 8.7.2 (não suporta `compileSdk 36`) | **8.10.1** |
+| Kotlin (`kotlin` / plugin Compose) | 2.0.21 (divergente do `kotlin-android`) | **2.2.20** (unificado) |
+| compileSdk / targetSdk | 36 | **36** (inalterado) |
+| Compose BOM / demais dependências | 2024.10.01 / inalteradas | **inalteradas** |
+
+## 11.4 Evidência 1 — Build Android validado (resultado real, relatado pelo usuário)
+
+| Campo | Valor |
+|---|---|
+| Comando | `.\gradlew.bat assembleDebug` |
+| Resultado | **BUILD SUCCESSFUL in 5m 27s** — 35 actionable tasks: 35 executed |
+| Efeito colateral | Instalação automática do **Android SDK Build-Tools 35.0.0** durante o build |
+| Warnings (não corrigidos, não bloqueantes) | (1) `Unable to strip libandroidx.graphics.path.so` / `libdatastore_shared_counter.so`; (2) `Duplicate branch condition` em `AppScreen.kt:316` (o branch `"chat" -> ChatLunaScreen(...)` está duplicado no `when`, linhas 289 e 316 — bug pré-existente, não introduzido nesta etapa, não corrigido por decisão de escopo) |
+
+**Este é o primeiro `BUILD SUCCESSFUL` real do projeto nesta linha de investigação** — as
+seções 1–10 nunca tiveram toolchain disponível para compilar.
+
+## 11.5 Código adicionado (Evidências 2 e 3 — lado Android)
+
+Sem alterar a assinatura de `RegistrarHojeScreen` usada por `AppScreen.kt` e sem tocar em nenhum
+código funcional já existente (`AuthApi`/`AuthViewModel`/`RetrofitClient` originais preservados):
+
+- `AuthApi.kt` / `AuthViewModel.kt`: `+me()` (`GET auth/me`) e `+buscarUsuarioAutenticado()` — só
+  para comprovar que o JWT salvo no `SessaoDataStore` é aceito por uma rota protegida; não chamado
+  por nenhuma tela ainda.
+- `RegistroDiarioApi.kt`, `RegistroDiarioDtos.kt`, `RegistroDiarioViewModel.kt` (novos): mesmo
+  padrão do `AuthViewModel`, para `POST`/`GET /registros-diarios`.
+- `RegistrarHojeScreen.kt`: o botão "Salvar" agora chama a API e só navega após sucesso real
+  (antes, `AppScreen.kt` descartava os dados digitados — bug já mapeado no `CLAUDE.md` §4).
+
+**Compilado com sucesso junto do restante do app (seção 11.4). Execução real no
+emulador/dispositivo (renderização, clique, token de fato persistido) ainda não foi observada
+nesta etapa** — ver 11.7.
+
+## 11.6 Backend: verificação ponta a ponta com HTTP real (mesmo padrão da seção 10.1, agora cobrindo também registros diários)
+
+Ambiente recriado nesta máquina (`backend/.venv`, `backend/.env` com `SECRET_KEY` gerado via
+`secrets.token_hex(32)`, `alembic upgrade head`):
+
+| # | Comando/Requisição | Esperado | Obtido |
+|---|---|---|---|
+| 1 | `pytest -q` | 146 passed | **146 passed, 1 warning em 63,23s** — bate com a seção 3.2/8.5 |
+| 2 | `POST /auth/registrar` | 201 | **201**, `UsuarioOut` completo |
+| 3 | `POST /auth/login` | 200 | **200**, `access_token` JWT real |
+| 4 | `GET /auth/me` com token | 200 | **200**, usuário autenticado retornado |
+| 5 | `GET /auth/me` sem token | 401 | **401**, `{"detail":"Not authenticated"}` |
+| 6 | `POST /registros-diarios` com token | 201 | **201**, registro criado (`id:1`) |
+| 7 | `GET /registros-diarios` com token | 200 | **200**, lista com o mesmo registro |
+
+**Achado descartado (falso positivo):** a primeira tentativa do item 6 via `curl`/Git Bash
+retornou `400 "There was an error parsing the body"` ao enviar o acento em "Cansaço" — não é bug
+do backend, é code page do terminal Windows/Git Bash montando o corpo da requisição. Repetido via
+`urllib` do Python (UTF-8 nativo): sucesso confirmado; bytes da resposta gravados em arquivo e
+lidos com encoding correto para confirmar que `"Cansaço"` chega intacto.
+
+## 11.7 O que ainda não está provado
+
+- **Execução real do app** (emulador ou dispositivo): nenhuma disponível nesta máquina —
+  `adb devices` retornou lista vazia e `emulator -list-avds` não mostrou nenhum AVD configurado.
+  Sem isso, não é possível observar visualmente login/cadastro, o token sendo salvo de fato, nem
+  `RegistrarHojeScreen` sendo usada de ponta a ponta pela interface real.
+- **Evidência 2 (auth ponta a ponta) e Evidência 3 (RegistrarHoje ponta a ponta)** continuam,
+  então, no mesmo status já registrado na seção 10.3 para o lado Android: código escrito,
+  revisado e (agora também) compilado com sucesso — execução real pendente.
+
+## 11.8 Próximo passo
+
+Criar um AVD (Android Studio → Device Manager, ou `avdmanager`), iniciá-lo, subir o backend
+(`uvicorn app.main:app --host 0.0.0.0 --port 8000` a partir de `backend/`) e repetir manualmente a
+sequência de login/cadastro/registro diário através da interface real — mesmo roteiro de
+`instrucoes-build-ufu.md`, seção 4, agora aplicável a esta máquina também (já tem toolchain).
+
+## 11.9 Verificações de integridade
+
+| Verificação | Resultado |
+|---|---|
+| `backend/.env` alterado/commitado | criado nesta máquina, **não rastreado** (`.gitignore`), confirmado antes de qualquer commit |
+| `AppScreen.kt` alterado | não |
+| Dependências Firebase removidas | não |
+| Warnings do build corrigidos | não — registrados, fora de escopo desta etapa |
+| Commits realizados | `b61a3dd`, `e3b51ab` |
+| Push realizado | sim, para `origin/develop` |
