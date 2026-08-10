@@ -29,4 +29,5 @@ object RetrofitClient {
         .build()
 
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
+    val registroDiarioApi: RegistroDiarioApi = retrofit.create(RegistroDiarioApi::class.java)
 }

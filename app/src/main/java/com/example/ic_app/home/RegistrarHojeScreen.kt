@@ -15,17 +15,34 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.RegistroDiarioUiState
+import com.example.ic_app.viewmodel.RegistroDiarioViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun RegistrarHojeScreen(
     modifier: Modifier = Modifier,
     onSalvarClick: () -> Unit,
-    onVoltarClick: () -> Unit
+    onVoltarClick: () -> Unit,
+    viewModel: RegistroDiarioViewModel = viewModel()
 ) {
     var humorSelecionado by remember { mutableStateOf("") }
     var sintomaSelecionado by remember { mutableStateOf("") }
     var observacao by remember { mutableStateOf("") }
+    var mensagemErro by remember { mutableStateOf("") }
+    val estado by viewModel.estado.collectAsState()
+
+    LaunchedEffect(estado) {
+        when (val estadoAtual = estado) {
+            is RegistroDiarioUiState.Sucesso -> onSalvarClick()
+            is RegistroDiarioUiState.Erro -> mensagemErro = estadoAtual.mensagem
+            else -> {}
+        }
+    }
 
     val fundo = Color(0xFFFFF7FA)
     val flamingo = Color(0xFFE91E63)
@@ -158,11 +175,32 @@ fun RegistrarHojeScreen(
             )
         )
 
+        if (mensagemErro.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = mensagemErro,
+                color = flamingo,
+                fontSize = 13.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = onSalvarClick,
-            enabled = humorSelecionado.isNotBlank() || sintomaSelecionado.isNotBlank() || observacao.isNotBlank(),
+            onClick = {
+                mensagemErro = ""
+                val dataHoje = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                viewModel.salvar(
+                    data = dataHoje,
+                    humor = humorSelecionado.ifBlank { null },
+                    sintomaPrincipal = sintomaSelecionado.ifBlank { null },
+                    observacao = observacao.ifBlank { null }
+                )
+            },
+            enabled = (humorSelecionado.isNotBlank() || sintomaSelecionado.isNotBlank() || observacao.isNotBlank()) &&
+                estado != RegistroDiarioUiState.Carregando,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -172,12 +210,19 @@ fun RegistrarHojeScreen(
                 disabledContainerColor = flamingoClaro
             )
         ) {
-            Text(
-                text = "Salvar registro",
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (estado == RegistroDiarioUiState.Carregando) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.height(20.dp)
+                )
+            } else {
+                Text(
+                    text = "Salvar registro",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
