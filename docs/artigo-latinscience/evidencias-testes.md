@@ -870,3 +870,222 @@ sequência de login/cadastro/registro diário através da interface real — mes
 | Warnings do build corrigidos | não — registrados, fora de escopo desta etapa |
 | Commits realizados | `b61a3dd`, `e3b51ab` |
 | Push realizado | sim, para `origin/develop` |
+
+---
+
+# 12. Emulador criado + Evidências 2 e 3 fechadas com execução real
+
+- **Data:** 2026-08-10
+- **Máquina:** "Mille" (a mesma das seções 1–10; `C:\Users\Mille\ic-app-kotlin`) — diferente da
+  "máquina do escritório" da seção 11, que já tinha JDK/SDK/Android Studio instalados. Aqui, no
+  início desta etapa, só havia um SDK **parcial** (`build-tools`, `platform-tools`,
+  `platforms;android-36`, `cmdline-tools`) em `C:\Android\sdk`, sem JDK, sem `emulator` e sem
+  nenhum AVD.
+- **Branch:** `develop` · **Commit base:** `becc4cf` (inalterado — nenhum commit feito nesta etapa)
+- **Objetivo:** criar um emulador funcional nesta máquina e, com ele, produzir a execução real que
+  faltava desde a seção 10.3/11.7 — Evidência 2 (autenticação ponta a ponta) e Evidência 3
+  (`RegistrarHojeScreen` ponta a ponta), agora observadas de fato na interface, não só por leitura
+  de código.
+
+## 12.1 Ambiente instalado nesta etapa
+
+| Componente | Como foi obtido | Caminho/versão |
+|---|---|---|
+| JDK | **zip portátil** do Adoptium (Temurin), não o instalador `.msi` — `winget install` do `.msi` falhou com `1602` ("o usuário cancelou a instalação"), causado pelo prompt de elevação (UAC) do Windows Installer não ter como ser respondido numa sessão não interativa | `C:\Android\jdk-17.0.20+8` (Temurin 17.0.20+8) |
+| Emulator + system image | `sdkmanager "emulator" "system-images;android-34;google_apis;x86_64"`, licenças aceitas via `sdkmanager --licenses` | emulator 37.1.11, system-image `android-34;google_apis;x86_64` rev. 14 |
+| AVD | `avdmanager create avd -n Luna_Test_API34 -k "system-images;android-34;google_apis;x86_64" -d pixel` | `Luna_Test_API34`, Android 14 (API 34), device `pixel`, RAM 2G |
+| Variáveis de ambiente | `JAVA_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT` e `PATH` (jdk/bin, sdk/platform-tools, sdk/emulator, sdk/cmdline-tools/latest/bin) persistidos a nível de usuário do Windows | — |
+
+Nenhuma instalação exigiu privilégio de administrador (JDK via zip, SDK/AVD via `sdkmanager`/`avdmanager`
+sob `C:\Android`, de propriedade do usuário atual).
+
+## 12.2 Emulador: boot headless
+
+```bash
+emulator -avd Luna_Test_API34 -no-window -no-audio -no-boot-anim -no-snapshot
+```
+
+Executado sem janela visível (`-no-window`) porque a interação com o app nesta etapa foi feita
+inteiramente via `adb` (toques, digitação, screenshots), não pela janela do emulador. Resultado:
+
+```
+USER_INFO    | Emulator is performing a full startup. This may take upto two minutes, or more.
+INFO         | Boot completed in 248211 ms
+```
+
+Boot completo em **~4 min 8 s**. `adb devices -l` confirmou o dispositivo:
+`emulator-5554 device product:sdk_gphone64_x86_64 ... device:emu64xa`, Android 14, ABI `x86_64`.
+
+## 12.3 Build e instalação do app no emulador
+
+```bash
+./gradlew.bat installDebug
+```
+
+**Resultado: `BUILD SUCCESSFUL in 20m 6s`** (primeiro build nesta máquina — baixou a distribuição
+do Gradle 8.11.1, o Android SDK Build-Tools 35 e todas as dependências). `installDebug` reportou
+`Installed on 1 device`. Mesmos dois warnings já documentados na seção 11.4 (`Unable to strip
+libandroidx.graphics.path.so`/`libdatastore_shared_counter.so`; `Duplicate branch condition` em
+`AppScreen.kt:316`) — nenhum novo warning introduzido, nenhum código alterado.
+
+## 12.4 Backend: mesmo padrão das seções 1–9 e 11.6, nesta máquina
+
+`backend/.venv` e `backend/.env` já existiam nesta máquina (seções 1–9). Migrations aplicadas do
+zero (`alembic upgrade head`, banco novo) e suíte completa executada antes de subir o servidor:
+
+```
+146 passed, 1 warning in 117.75s (0:01:57)
+```
+
+`uvicorn app.main:app --host 0.0.0.0 --port 8000` iniciado em seguida, para o emulador alcançar via
+`http://10.0.2.2:8000/` (`RetrofitClient.BASE_URL`, já configurado — ver seção 10.2) — e, para as
+chamadas via `curl` feitas diretamente desta máquina (não do emulador) usadas para conferência,
+`http://127.0.0.1:8000/`.
+
+## 12.5 Evidência 2 — Autenticação ponta a ponta, observada na interface real
+
+Sequência executada tocando na interface do app (via `adb shell input tap`/`text`, com screenshots
+em cada etapa): Home → card "Fazer login" → "Criar conta" → preenchimento de
+nome/e-mail/senha/confirmar senha → "Criar conta".
+
+| # | Ação na interface | Requisição observada no backend | Resultado |
+|---|---|---|---|
+| 1 | Preencher formulário e tocar "Criar conta" | `POST /auth/registrar` | **201 Created** |
+| 2 | (automático, `AuthViewModel.registrar` encadeia login) | `POST /auth/login` | **200 OK** |
+| 3 | App navega de volta para a Home, autenticado | — | tela "Boa noite, Usuária" renderizada |
+
+Dados usados: nome `TesteEvidencia`, e-mail `teste.evidencia2@luna.app`, senha numérica de 12
+dígitos (ver 12.7 sobre por que numérica).
+
+**Confirmação de que o token JWT foi de fato persistido no dispositivo** (não só recebido pela
+rede): o `SessaoDataStore` grava em Preferences DataStore com nome `"sessao"`, arquivo
+`files/datastore/sessao.preferences_pb` dentro do sandbox do app. Extraído com:
+
+```bash
+adb shell run-as com.example.ic_app cat files/datastore/sessao.preferences_pb
+```
+
+Token real encontrado no arquivo binário (isolado via `grep -o 'eyJ[A-Za-z0-9_.-]*'`):
+
+```
+<token_omitido_por_seguranca — JWT válido no formato header.payload.signature, extraído com sucesso do arquivo binário>
+```
+
+Payload decodificado (base64, só para conferência — a assinatura não foi verificada manualmente):
+`{"sub": "1", "exp": 1786411570}` — `sub` bate com o `id` do usuário criado.
+
+**Confirmação de que esse token é válido perante o backend**: o mesmo token extraído do
+dispositivo foi usado direto num `GET /auth/me`:
+
+```bash
+curl -H "Authorization: Bearer <token do DataStore>" http://127.0.0.1:8000/auth/me
+# {"id":1,"email":"teste.evidencia2@luna.app","nome":"TesteEvidencia", ...}
+```
+
+**200 OK**, com os mesmos `email`/`nome` digitados na interface. Isso fecha o ciclo completo:
+interface real → rede real → persistência real no dispositivo → o token persistido é aceito de
+volta pelo backend numa rota protegida.
+
+## 12.6 Evidência 3 — `RegistrarHojeScreen` ponta a ponta, observada na interface real
+
+Sequência: Home → card "Sintomas" (Acesso Rápido, ambos "Sintomas" e "Humor" levam a
+`RegistrarHojeScreen` — ver `HomeScreen.kt`) → seleção de humor "Bem" → seleção de sintoma
+"Cansaço" → observação "Registro real do emulador" → "Salvar registro".
+
+| # | Ação | Requisição | Resultado |
+|---|---|---|---|
+| 1 | Tocar "Salvar registro" (1ª tentativa) | `POST /registros-diarios` | **422** (ver achado 12.7.b) |
+| 2 | Corrigir fuso horário do emulador (12.7.b) e repetir | `POST /registros-diarios` | **201 Created** |
+| 3 | Conferência independente | `GET /registros-diarios` (com o token do 12.5) | **200 OK** |
+
+Corpo retornado pelo `GET`, batendo exatamente com o que foi digitado na interface:
+
+```json
+[{"id":1,"usuario_id":1,"data":"2026-08-10","humor":"Bem","sintoma_principal":"Cansaço","observacao":"Registro real do emulador","criado_em":"2026-08-11T00:47:21"}]
+```
+
+Após o sucesso, o app navegou de volta para a Home (mesmo comportamento de `onSalvarClick` já
+descrito na seção 11.5).
+
+## 12.7 Achados genuínos desta etapa (não corrigidos — registrados, por decisão de escopo)
+
+Três achados surgiram só ao operar o app de verdade num emulador, nenhum visível nas seções 1–11
+(que ou testavam o backend isolado, ou liam o código Android sem executá-lo). Mesmo espírito do
+achado da seção 10.1 ("os testes passam, mas rodar de verdade revela uma lacuna").
+
+**(a) Duplo toque no botão "voltar" do sistema fecha o app inteiro, sem crash.** `AppScreen.kt`
+não usa Navigation Compose (é o `when (telaAtual)` documentado na seção 5) e não registra nenhum
+callback de back por tela; o botão físico/gesto "voltar" do Android, então, cai no comportamento
+padrão da `Activity` e a finaliza. Isso não é um bug introduzido agora — é a consequência esperada
+da arquitetura atual, já coberta pelo item "Migração para Navigation Compose" (seção 11, etapa 8 do
+plano). Ocorreu durante o teste manual (dois `adb shell input keyevent 4` em sequência), forçando
+recomeçar o fluxo de onboarding uma vez; nenhum dado ou código foi afetado.
+
+**(b) Fuso horário do emulador (UTC) divergente do host (America/Sao_Paulo, UTC−3) quebra
+`RegistrarHojeScreen` quando o backend roda na mesma máquina.** `RegistrarHojeScreen.kt:194` usa
+`SimpleDateFormat("yyyy-MM-dd").format(Date())` — a data "de hoje" segundo o relógio do
+**dispositivo**. Por padrão, um AVD novo sobe com fuso `GMT`/UTC; como o teste foi feito depois das
+21h (horário de Brasília) já era madrugada em UTC, o emulador enviou `"2026-08-11"` enquanto o
+backend, rodando no host em `"2026-08-10"`, rejeitou como data futura (`RegistroDiarioCreate`
+valida `data` não futura) — daí o **422** do passo 1 da seção 12.6. **Correção aplicada foi de
+ambiente, não de código:** `adb root` seguido de
+`adb shell setprop persist.sys.timezone America/Sao_Paulo` e
+`adb shell am broadcast -a android.intent.action.TIMEZONE_CHANGED`, alinhando o relógio do emulador
+ao do host. Nenhum arquivo do projeto foi alterado. Fica registrado como achado — relevante para
+quem for reproduzir este roteiro em outra máquina/fuso, e para a UFU, onde emulador e backend
+também rodarão na mesma máquina.
+
+**(c) `RegistrarHojeScreen` não tem rolagem — o botão "Salvar registro" fica fora da área tocável
+na densidade padrão do device profile `pixel` (420 dpi).** O `Column` raiz em
+`RegistrarHojeScreen.kt:54` usa `fillMaxSize().padding(24.dp)`, sem `verticalScroll` nem
+`LazyColumn`. Com humor + 3 opções de sintoma + campo de observação, o conteúdo intrínseco excede a
+altura da tela em 420 dpi, e o botão de salvar não aparece nem é alcançável por nenhum gesto (a
+tela realmente não rola — confirmado tentando `adb shell input swipe` em várias direções, sem
+efeito). **Contorno usado, só nesta sessão do emulador:** `adb shell wm density 300` (reduz a
+densidade lógica, dando mais espaço em dp para o mesmo conteúdo), o que reinicia a `Activity` atual
+(exigiu renavegar o onboarding uma vez). Nenhum arquivo do projeto foi alterado — a correção real
+(adicionar `Modifier.verticalScroll(rememberScrollState())` ao `Column`) é uma tarefa de UI própria,
+fora do escopo desta etapa de evidências, e deve ser combinada com o usuário antes de ser aplicada
+(regra da seção 10 do `CLAUDE.md`).
+
+Um quarto ponto, sem relação com o app, também vale registrar: o `.msi` do JDK falhou via
+`winget install` por exigir elevação (UAC) numa sessão não interativa (seção 12.1) — contornado
+usando o `.zip` portátil do mesmo binário, sem qualquer alteração de escopo de instalação.
+
+## 12.8 O que estes números comprovam — e o que ainda não comprovam
+
+### Comprovam (novo nesta etapa, em relação à seção 11.7)
+
+- **Evidência 2 fechada de verdade:** cadastro e login automático de uma usuária real, na interface
+  real, contra o backend real, com o JWT resultante persistido no dispositivo e validado de volta
+  pelo backend numa rota protegida (`/auth/me`).
+- **Evidência 3 fechada de verdade:** `RegistrarHojeScreen` usada na interface real, com o registro
+  resultante confirmado por uma leitura independente (`GET /registros-diarios`) que bate campo a
+  campo com o que foi digitado.
+- Ambas foram observadas com o app **compilado e instalado** num emulador criado nesta mesma
+  sessão, não em leitura de código nem em `TestClient` — o mesmo padrão de rigor da seção 10.1,
+  agora também para o lado Android.
+
+### Ainda não comprovam
+
+- **Cobertura de UI automatizada.** A interação foi manual via `adb shell input`, não um framework
+  de teste instrumentado (Espresso/Compose UI Test) — não há suíte repetível para esses fluxos.
+- **Comportamento em dispositivo físico.** Only emulador; `10.0.2.2` e o comportamento de
+  DataStore/`run-as` são específicos de emulador/dispositivo de debug.
+- **Os três achados da seção 12.7** continuam sem correção de código — são achados, não
+  regressões resolvidas.
+
+## 12.9 Verificações de integridade
+
+| Verificação | Resultado |
+|---|---|
+| Código-fonte Android alterado | não |
+| Código-fonte do backend alterado | não |
+| `backend/.env` alterado | não (já existia nesta máquina) |
+| `AppScreen.kt` / `RegistrarHojeScreen.kt` alterados | não — achado (c) da seção 12.7 registrado, não corrigido |
+| `gradle/wrapper/gradle-wrapper.properties` | `networkTimeout` ajustado de `10000` para `120000` (conflito de merge local resolvido ao sincronizar o repositório no início desta sessão; não é código do app) |
+| Fuso horário / densidade do emulador alterados | sim, só na sessão do emulador (`Luna_Test_API34`) — não persiste no `config.ini` do AVD, não afeta outras execuções |
+| `backend/luna.db` criado nesta sessão | sim, não rastreado (`.gitignore`) |
+| `app-debug.apk` gerado | sim, não rastreado (`.gitignore`) |
+| Commits realizados | **nenhum** |
+| Push realizado | não |
