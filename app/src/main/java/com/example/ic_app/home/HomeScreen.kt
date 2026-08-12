@@ -375,6 +375,14 @@ fun CyclePremiumCard(
                 color = textoSecundario,
                 fontSize = 15.sp
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Estimativas informativas. O Luna não substitui " +
+                        "avaliação de profissional de saúde e não deve ser " +
+                        "usado como método contraceptivo.",
+                color = textoSecundario,
+                fontSize = 11.sp
+            )
         }
     }
 }
