@@ -1,3 +1,5 @@
+package com.example.ic_app.components
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,7 +40,9 @@ fun RegistroOpcaoCard(
         )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -52,7 +56,7 @@ fun RegistroOpcaoCard(
                 text = titulo,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = textoPrincipal
+                color = if (selecionado) flamingo else textoPrincipal
             )
         }
     }

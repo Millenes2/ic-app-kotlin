@@ -4,20 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ic_app.components.HumorItem
+import com.example.ic_app.components.RegistroOpcaoCard
 import com.example.ic_app.ui.theme.Ic_appTheme
 import com.example.ic_app.viewmodel.RegistroDiarioUiState
 import com.example.ic_app.viewmodel.RegistroDiarioViewModel
@@ -101,19 +100,19 @@ fun RegistrarHojeScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            RegistroEmojiItem("😊", "Bem", humorSelecionado == "Bem") {
+            HumorItem("😊", "Bem", humorSelecionado == "Bem", flamingo) {
                 humorSelecionado = "Bem"
             }
 
-            RegistroEmojiItem("😴", "Cansada", humorSelecionado == "Cansada") {
+            HumorItem("😴", "Cansada", humorSelecionado == "Cansada", flamingo) {
                 humorSelecionado = "Cansada"
             }
 
-            RegistroEmojiItem("😔", "Triste", humorSelecionado == "Triste") {
+            HumorItem("😔", "Triste", humorSelecionado == "Triste", flamingo) {
                 humorSelecionado = "Triste"
             }
 
-            RegistroEmojiItem("😠", "Irritada", humorSelecionado == "Irritada") {
+            HumorItem("😠", "Irritada", humorSelecionado == "Irritada", flamingo) {
                 humorSelecionado = "Irritada"
             }
         }
@@ -229,93 +228,6 @@ fun RegistrarHojeScreen(
         }
     }
 }
-
-@Composable
-fun RegistroEmojiItem(
-    emoji: String,
-    texto: String,
-    selecionado: Boolean,
-    onClick: () -> Unit
-) {
-    val flamingo = Color(0xFFE91E63)
-    val textoSecundario = Color(0xFF666666)
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(58.dp)
-                .background(
-                    color = if (selecionado) flamingo.copy(alpha = 0.12f) else Color.White,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = emoji,
-                fontSize = 28.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = texto,
-            fontSize = 12.sp,
-            color = if (selecionado) flamingo else textoSecundario,
-            fontWeight = if (selecionado) FontWeight.Bold else FontWeight.Normal,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-fun RegistroOpcaoCard(
-    emoji: String,
-    titulo: String,
-    selecionado: Boolean,
-    onClick: () -> Unit
-) {
-    val flamingo = Color(0xFFE91E63)
-    val rosaClaro = Color(0xFFFFF0F5)
-    val cinzaFundo = Color(0xFFF2EEF1)
-    val textoPrincipal = Color(0xFF1F1F1F)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selecionado) rosaClaro else cinzaFundo
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = emoji,
-                fontSize = 24.sp
-            )
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Text(
-                text = titulo,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (selecionado) flamingo else textoPrincipal
-            )
-        }
-    }
-}
-
-
 
 @Preview(showBackground = true)
 @Composable
