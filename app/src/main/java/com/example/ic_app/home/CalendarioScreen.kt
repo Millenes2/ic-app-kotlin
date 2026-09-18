@@ -17,15 +17,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.RegistroCicloUiState
+import com.example.ic_app.viewmodel.RegistroCicloViewModel
 
 @Composable
 fun CalendarioScreen(
     modifier: Modifier = Modifier,
-    onVoltarHomeClick: () -> Unit
+    onVoltarHomeClick: () -> Unit,
+    viewModel: RegistroCicloViewModel = viewModel()
 ) {
     var diaSelecionado by remember { mutableStateOf("12") }
     var menstruacaoRegistrada by remember { mutableStateOf(false) }
+    var mensagemErro by remember { mutableStateOf("") }
+    val estado by viewModel.estado.collectAsState()
+    val salvando = estado is RegistroCicloUiState.Carregando
+
+    // RegistroCicloRepository sempre salva para a data de hoje (ver seu
+    // comentário): a semana exibida aqui é fixa/fictícia, sem correspondência
+    // real com o calendário do dispositivo (CLAUDE.md seção 4).
+    LaunchedEffect(estado) {
+        when (val estadoAtual = estado) {
+            is RegistroCicloUiState.Erro -> mensagemErro = estadoAtual.mensagem
+            is RegistroCicloUiState.Sucesso -> mensagemErro = ""
+            else -> {}
+        }
+    }
 
     val fundo = Color(0xFFFFF9FB)
     val rosaPremium = Color(0xFFD86C9E)
@@ -204,8 +222,21 @@ fun CalendarioScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        if (mensagemErro.isNotBlank()) {
+            Text(
+                text = mensagemErro,
+                color = Color(0xFFB00020),
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         Button(
-            onClick = { menstruacaoRegistrada = true },
+            onClick = {
+                mensagemErro = ""
+                viewModel.salvar(menstruacaoRegistrada)
+            },
+            enabled = !salvando,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -215,7 +246,7 @@ fun CalendarioScreen(
             )
         ) {
             Text(
-                text = "Salvar registro menstrual",
+                text = if (salvando) "Salvando..." else "Salvar registro menstrual",
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
