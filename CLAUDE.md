@@ -6,16 +6,16 @@ Este arquivo fornece orientações ao Claude Code (claude.ai/code) para trabalha
 
 Luna é um aplicativo Android (Kotlin + Jetpack Compose, package `com.example.ic_app`, nome do módulo `ic_app`) voltado ao acompanhamento do ciclo menstrual e da saúde feminina: humor, sintomas, fertilidade, gestação e bem-estar. Todo texto de interface, nomes de tela e identificadores de código estão em português (pt-BR); código novo deve seguir o mesmo padrão (ex.: `nomeUsuario`, `onContinuarClick`, `telaAtual`).
 
-Hoje o projeto é essencialmente um protótipo de interface: todas as telas do fluxo existem e navegam entre si, mas nenhum dado é persistido de forma real — tudo vive em `remember { mutableStateOf(...) }` e se perde ao fechar o app.
+O projeto está em transição de protótipo de interface para app com dados reais e multiusuário: a maioria das telas ainda guarda estado local em `remember { mutableStateOf(...) }`, mas autenticação (cadastro/login) e registro diário já persistem de fato no backend, via uma camada Android completa (Retrofit + DataStore + ViewModel + Repository) já implementada — ver seções 5 e 7.
 
-O objetivo do trabalho em andamento é evoluir esse protótipo para um app com dados reais e multiusuário, por meio de:
-- Um backend próprio em FastAPI + SQLAlchemy, usando SQLite em desenvolvimento e PostgreSQL futuramente.
-- Autenticação via JWT emitido pelo backend.
-- Reorganização do Android em MVVM, consumindo o backend via Retrofit e armazenando o token de sessão com DataStore.
-- Substituição futura da navegação por `when`/`telaAtual` por Navigation Compose.
-- Uma decisão explícita sobre o papel do Firebase (hoje usado parcialmente para autenticação) diante da nova autenticação JWT (ver seções 12 e 13).
+O objetivo do trabalho em andamento é completar essa transição, por meio de:
+- Um backend próprio em FastAPI + SQLAlchemy, usando SQLite em desenvolvimento e PostgreSQL futuramente. *(fundação, autenticação e endpoints de domínio já implementados — ver seção 7)*
+- Autenticação via JWT emitido pelo backend. *(implementada; Firebase foi efetivamente abandonado no Android, ver seções 6, 12 e 13)*
+- Reorganização do Android em MVVM, consumindo o backend via Retrofit e armazenando o token de sessão com DataStore. *(parcialmente implementada: ViewModel + Repository + DataStore + Retrofit já existem para autenticação e registro diário; ainda falta conectar as demais telas — ver seção 7)*
+- Substituição futura da navegação por `when`/`telaAtual` por Navigation Compose. *(ainda não iniciada)*
+- Uma decisão explícita sobre o papel do Firebase diante da nova autenticação JWT (ver seções 12 e 13). *(decisão já executada na prática pelo código; a remoção autorizada da config órfã no Android já foi feita — resta só `firebase_admin` no backend, ver seção 6)*
 
-Nenhuma implementação de backend ou refatoração do Android foi iniciada ainda — este arquivo documenta o estado atual do código e o planejamento, não um trabalho já em curso.
+Este arquivo documenta o estado atual do código e o planejamento. A fundação do backend, a autenticação JWT, os endpoints de domínio e o início da camada de rede no Android já foram implementados; o restante do plano (MVVM completo, Navigation Compose, remoção do Firebase) segue em andamento.
 
 ## 2. Comandos
 
@@ -32,44 +32,47 @@ Executar a partir da raiz do repositório com o Gradle wrapper:
 O backend tem seu próprio virtualenv em `backend/.venv`.
 - Instalar dependências: `pip install -r backend/requirements.txt` (dentro do virtualenv)
 - Rodar o servidor de desenvolvimento: `uvicorn app.main:app --reload` (executar a partir de `backend/`)
-- Existe um `requirements.txt` duplicado na raiz do repositório, quase idêntico ao de `backend/`; o de `backend/` é o realmente usado pela aplicação FastAPI. Confirmar com o usuário se o da raiz ainda é necessário antes de consolidar dependências.
+- O `requirements.txt` duplicado que existia na raiz do repositório foi removido (era um subconjunto incompleto do de `backend/`, sem `alembic`/`bcrypt`/`PyJWT`/`SQLAlchemy`/`pytest` etc.); `backend/requirements.txt` é a única fonte de dependências do backend.
 
 ## 3. Funcionalidades Android já implementadas
 
-Fluxo completo de telas, todas navegáveis e visualmente prontas, mas sem persistência real (ver seção 4):
+Fluxo completo de telas, todas navegáveis e visualmente prontas. A maioria ainda não tem persistência real, com exceção de autenticação e registro diário, que já falam com o backend (ver seção 4):
 
-- **Onboarding**: `BemVindoScreen` (splash) → `ConsentScreen` (checkbox de consentimento com diálogo de política de dados) → `DataNascimentoScreen` (valida idade mínima de 12 anos) → `PesoScreen` → `NomeScreen` → `ObjetivoScreen` (escolha de um entre 6 objetivos).
-- **Sub-fluxos por objetivo** (`objetivos/<objetivo>/Screen1..3`): `regularidade`, `entender_corpo` (uma única tela), `engravidar`, `gestacao`, `saude_mental` — cada tela coleta uma opção selecionada localmente por meio de cards clicáveis.
+- **Onboarding**: `BemVindoScreen` (splash) → `ConsentScreen` (checkbox de consentimento com diálogo de política de dados) → `DataNascimentoScreen` (valida idade mínima de 12 anos) → `PesoScreen` → `NomeScreen` → `ObjetivoScreen` (escolha de um entre 7 objetivos).
+- **Sub-fluxos por objetivo** (`objetivos/<objetivo>/Screen1..3`), um para cada um dos 7 objetivos de `ObjetivoScreen`: `regularidade`, `sintomas`, `entender_corpo`, `bemestar`, `engravidar`, `gestacao`, `saude_mental` — cada tela coleta uma opção selecionada localmente por meio de cards clicáveis (todos com 3 etapas).
 - **Home** (`HomeScreen`): saudação conforme o horário do dia, chips de status (humor/energia/sintomas, com valores fixos), card de ciclo (valores fixos, ex. "Dia 14 de 28"), atalhos para chat, calendário, perfil e registro do dia.
-- **Registrar hoje** (`RegistrarHojeScreen`): seleção de humor (emoji), sintoma principal e campo de observação em texto livre.
-- **Calendário** (`CalendarioScreen`): seleção de dia dentro de uma lista fixa de dias da semana, com checkbox de "menstruação registrada" para o dia selecionado.
+- **Registrar hoje** (`RegistrarHojeScreen`): seleção de humor (emoji), sintoma principal e campo de observação em texto livre, **persistido de fato** via `RegistroDiarioViewModel` → `POST /registros-diarios` (ver seção 7).
+- **Calendário** (`CalendarioScreen`): seleção de dia dentro de uma lista fixa de dias da semana, com checkbox de "menstruação registrada" para o dia selecionado — ainda só em estado local, sem chamar `/registros-ciclo`.
 - **Chat com a Lunete** (`ChatLunaScreen`): interface de chat funcional, com respostas geradas localmente por regras de palavra-chave (`gerarRespostaSimulada`), sem qualquer IA real por trás.
-- **Perfil** (`PerfilScreen`): campos editáveis de nome, data de nascimento, peso e objetivo, inicializados com o estado global de `AppScreen`.
-- **Autenticação** (`CriarConta`): cadastro de conta chamando `FirebaseAuth.createUserWithEmailAndPassword` de fato.
+- **Perfil** (`PerfilScreen`): campos editáveis de nome, data de nascimento, peso e objetivo, inicializados com o estado global de `AppScreen` — ainda não chama `GET`/`PATCH /perfil`.
+- **Autenticação** (`LoginScreen`, `CriarConta`): cadastro e login **funcionais de fato contra o backend próprio**, via `AuthViewModel` → `POST /auth/registrar` e `POST /auth/login`, com o token JWT salvo em DataStore (`SessaoDataStore`) e anexado nas chamadas autenticadas. `FirebaseAuth` **não é mais chamado em nenhuma tela** — só resta configuração órfã (plugin `com.google.gms.google-services` + `app/google-services.json`), ver seção 6.
 
 ## 4. Funcionalidades incompletas ou com problemas
 
-- Nenhum dado é persistido: perfil, humor, sintomas, observações, registros de calendário, mensagens de chat e respostas dos sub-fluxos de objetivo existem apenas em memória durante a sessão do Compose.
-- As opções selecionadas nas telas `objetivos/<objetivo>/Screen1..3` são coletadas na interface, mas o callback correspondente em `AppScreen.kt` ignora o valor recebido (ex.: `onContinuarClick = { telaAtual = "engravidar2" }`) — a informação nunca é armazenada, nem no estado global.
-- Os objetivos "Acompanhar sintomas" e "Melhorar meu bem-estar" resolvem para as chaves `"sintomas1"` e `"bemestar1"` em `ObjetivoScreen`/`AppScreen.kt`, mas não existe nenhum branch no `when` para essas chaves — selecionar um desses objetivos hoje resulta em tela em branco.
-- `LoginScreen` não chama `FirebaseAuth.signInWithEmailAndPassword` nem qualquer outro serviço: o botão "Entrar" avança independente do que for digitado.
+- A maior parte dos dados ainda não é persistida: perfil, registros de calendário, mensagens de chat e respostas dos sub-fluxos de objetivo existem apenas em memória durante a sessão do Compose (autenticação e registro diário já são exceção, ver seção 3).
+- As opções selecionadas nas telas `objetivos/<objetivo>/Screen1..3` são coletadas na interface, mas o callback correspondente em `AppScreen.kt` ignora o valor recebido (ex.: `onContinuarClick = { telaAtual = "engravidar2" }`) — a informação nunca é armazenada, nem no estado global, embora o backend já exponha `POST /respostas-objetivo` para persistir essa escolha (ver seção 7).
 - Os botões "Esqueci minha senha" e "Entrar com Google" em `LoginScreen` não têm ação implementada.
-- O botão "Salvar alterações" em `PerfilScreen` apenas retorna para a home, sem persistir as edições feitas nos campos.
-- O calendário é estático (uma única semana fixa, sem lógica real de mês/ano), e as previsões de ciclo exibidas na home e no calendário são texto fixo, não calculado.
-- O backend FastAPI só tem as rotas `/` e `/health` — nenhuma entidade, rota de negócio ou autenticação implementada.
-- Há dois arquivos `requirements.txt` (raiz e `backend/`) quase idênticos, sem que fique claro qual deve continuar existindo.
-- Não existe camada de ViewModel ou Repository em nenhuma tela — toda lógica está dentro dos próprios `@Composable`.
-- `HumorItem.kt` e `RegistroOpcaoCard.kt` estão soltos em `app/src/main/java/`, sem pacote, e duplicam composables homônimos já definidos dentro de `home/RegistrarHojeScreen.kt`.
-- Não há testes além dos templates padrão gerados pelo Android Studio (`ExampleUnitTest`, `ExampleInstrumentedTest`).
+- O botão "Salvar alterações" em `PerfilScreen` apenas retorna para a home, sem persistir as edições feitas nos campos (o backend já expõe `PATCH /perfil`, ver seção 7, mas a tela ainda não o chama).
+- O calendário é estático (uma única semana fixa, sem lógica real de mês/ano), e as previsões de ciclo exibidas na home e no calendário são texto fixo, não calculado. `CalendarioScreen` também ainda não chama `/registros-ciclo` (backend já pronto).
+- `ConsentScreen` ainda não chama `POST`/`GET /consentimentos` (backend já pronto).
+- Existe camada de ViewModel (`AuthViewModel`, `RegistroDiarioViewModel`) e Repository (`AuthRepository`, `RegistroDiarioRepository`) para autenticação e registro diário — os ViewModels não chamam mais `RetrofitClient` diretamente. As demais telas (perfil, calendário, objetivos, consentimento, chat) ainda mantêm toda a lógica dentro dos próprios `@Composable`, sem ViewModel nem Repository.
+- Não há testes além dos templates padrão gerados pelo Android Studio (`ExampleUnitTest`, `ExampleInstrumentedTest`) do lado Android. O backend, por outro lado, já tem 150 testes automatizados (ver seção 7).
 
 ## 5. Arquitetura atual do Android
 
-Não existe `NavHost` nem Jetpack Navigation. Toda a navegação está centralizada em `app/src/main/java/com/example/ic_app/navigation/AppScreen.kt`:
+Não existe `NavHost` nem Jetpack Navigation. Toda a navegação continua centralizada em `app/src/main/java/com/example/ic_app/navigation/AppScreen.kt`:
 - `telaAtual: String` guarda a chave da tela atual (ex.: `"home"`, `"regularidade1"`, `"engravidar2"`) e controla um bloco `when` que compõe a tela correspondente.
-- Um pequeno conjunto de variáveis (`nomeUsuario`, `objetivoUsuario`, `dataNascimentoUsuario`, `pesoUsuario`), todas `remember { mutableStateOf(...) }`, é o único estado compartilhado entre telas. As telas recebem esses valores como parâmetros e os alteram por meio de callbacks (`onContinuarClick = { valor -> ... }`).
-- Não existe ViewModel nem Repository hoje: toda lógica de estado e navegação vive nos próprios composables.
+- Um pequeno conjunto de variáveis (`nomeUsuario`, `objetivoUsuario`, `dataNascimentoUsuario`, `pesoUsuario`), todas `remember { mutableStateOf(...) }`, ainda é o estado compartilhado para o fluxo de onboarding e telas não conectadas ao backend. As telas recebem esses valores como parâmetros e os alteram por meio de callbacks (`onContinuarClick = { valor -> ... }`).
 
-Fluxo de telas: `boas-vindas` → `consentimento` → `data_nascimento` → `peso` → `nome` → `objetivo`, que se ramifica em um dos sub-fluxos por objetivo (`regularidade1..3`, `entender1`, `engravidar1..3`, `gestacao1..3`, `saudemental1..3`), todos terminando em `"home"`. A partir da home é possível chegar a `chat`, `calendario`, `perfil`, `registrar_hoje` e à autenticação (`login` → `criar`).
+Já existe uma camada de rede real, introduzida para autenticação e registro diário (etapa 5 do plano, parcialmente concluída — ver seção 11):
+- `data/remote/RetrofitClient.kt` — cliente Retrofit + OkHttp + Gson, `baseUrl` apontando para `http://10.0.2.2:8000/` (endereço do host a partir do emulador Android).
+- `data/remote/AuthApi.kt` e `data/remote/RegistroDiarioApi.kt` — interfaces Retrofit espelhando os endpoints `/auth/*` e `/registros-diarios`, com DTOs em `data/remote/dto/`.
+- `data/local/SessaoDataStore.kt` — Preferences DataStore guardando o token JWT.
+- `viewmodel/AuthViewModel.kt` e `viewmodel/RegistroDiarioViewModel.kt` (`AndroidViewModel`, expondo `StateFlow`) — usados por `LoginScreen`/`CriarConta` e por `RegistrarHojeScreen`, respectivamente.
+- `repository/AuthRepository.kt` e `repository/RegistroDiarioRepository.kt` (etapa 6 do plano, concluída para esses dois fluxos) — fonte única de verdade entre ViewModel e Retrofit/DataStore; os ViewModels não chamam mais `RetrofitClient` diretamente. `repository/RespostaErroUtils.kt` centraliza o parsing do corpo de erro (`{"detail": "..."}`) compartilhado pelos dois repositories.
+- As demais telas (perfil, calendário, objetivos, consentimento) continuam apenas com estado local, sem ViewModel/Repository nem chamada de rede.
+
+Fluxo de telas: `boas-vindas` → `consentimento` → `data_nascimento` → `peso` → `nome` → `objetivo`, que se ramifica em um dos sub-fluxos por objetivo (`regularidade1..3`, `sintomas1..3`, `entender1..3`, `bemestar1..3`, `engravidar1..3`, `gestacao1..3`, `saudemental1..3`), todos terminando em `"home"`. A partir da home é possível chegar a `chat`, `calendario`, `perfil`, `registrar_hoje` e à autenticação (`login` → `criar`).
 
 Estrutura de pacotes em `app/src/main/java/com/example/ic_app/`:
 - `onboarding/` — telas exibidas antes do primeiro acesso à home.
@@ -79,18 +82,20 @@ Estrutura de pacotes em `app/src/main/java/com/example/ic_app/`:
 - `navigation/` — `AppScreen`, a state machine descrita acima.
 - `components/` — composables reutilizáveis (ex.: `ObjetivoCard`).
 - `ui/theme/` — tema Compose (`Ic_appTheme`, `Color.kt`, `Type.kt`); a maioria das telas define paletas de cor locais (`Color(0xFF...)`) em vez de usar `MaterialTheme.colorScheme` — ao editar uma tela, seguir a paleta local dela.
-- `HumorItem.kt` e `RegistroOpcaoCard.kt` ficam diretamente em `java/`, sem pacote (ver seção 4 sobre a duplicação com `RegistrarHojeScreen.kt`).
+- `HumorItem.kt` e `RegistroOpcaoCard.kt` foram movidos de `java/` (soltos, sem pacote) para `components/`, e `RegistrarHojeScreen.kt` passou a reutilizá-los em vez de manter definições locais duplicadas.
+- `data/remote/` — `RetrofitClient`, `AuthApi`, `RegistroDiarioApi` e DTOs em `data/remote/dto/`; `data/local/` — `SessaoDataStore` (token JWT).
+- `viewmodel/` — `AuthViewModel`, `RegistroDiarioViewModel` (sem camada Repository ainda, ver seção 5).
 
 ## 6. Situação atual do Firebase
 
-- Dependências presentes no Android: `firebase-auth` e `firebase-firestore`, via `firebase-bom:33.7.0`, além do `google-services.json` versionado em `app/`.
-- Uso real: apenas `FirebaseAuth` em `CriarConta.kt`, para cadastro por e-mail/senha (`createUserWithEmailAndPassword`). `LoginScreen.kt` não chama nenhum método do Firebase. Firestore não é usado em nenhum ponto do código, apesar de estar como dependência.
-- No lado Python, `backend/requirements.txt` inclui `firebase_admin` e bibliotecas do Firestore, mas `backend/app/main.py` não importa nem inicializa nada disso.
-- Resumo: o Firebase está integrado apenas parcialmente (só cadastro, só no cliente Android), sem verificação de sessão, sem uso de Firestore e sem qualquer integração com o backend Python.
+- **Dependências de build removidas** (com autorização explícita do usuário): o plugin `com.google.gms.google-services` foi retirado de `build.gradle.kts` (raiz e `app/`) e `app/google-services.json` foi removido do repositório. Não havia nenhuma dependência `firebase-*` (nem `firebase-auth`, nem `firebase-firestore`, nem `firebase-bom`) — só restava o plugin e o JSON, ambos já removidos.
+- Uso real: **nenhum**. `FirebaseAuth`, `createUserWithEmailAndPassword` e `signInWithEmailAndPassword` não são chamados em nenhuma tela — a única menção a "Firebase" no código é um comentário histórico em `AuthViewModel.kt`. `CriarConta.kt` e `LoginScreen.kt` autenticam via `AuthViewModel` contra o backend próprio (`POST /auth/registrar`/`POST /auth/login`), ver seção 3.
+- No lado Python, `backend/requirements.txt` ainda inclui `firebase_admin` e bibliotecas do Firestore, mas `backend/app/main.py` não importa nem inicializa nada disso — remoção pendente, ainda não autorizada explicitamente (diferente da config órfã do Android, já removida).
+- Resumo: o Firebase foi **efetivamente abandonado na prática** — a Opção B da seção 12 (autenticação própria com JWT) já foi executada no código, e a config órfã do Android (plugin gms + `google-services.json`) já foi removida. Falta apenas `firebase_admin`/bibliotecas do Firestore em `backend/requirements.txt`, ainda pendente de autorização explícita (ver seção 10).
 
 ## 7. Situação atual do FastAPI
 
-- `backend/app/main.py` inclui o router de autenticação e CORS (`allow_origins=["*"]`, `allow_credentials=False` — sem cookies, a autenticação é via header `Authorization: Bearer`), além das rotas originais `GET /` e `GET /health`. Nenhuma rota de domínio (perfil, registro diário, ciclo, objetivo) existe ainda — isso é a etapa 4.
+- `backend/app/main.py` inclui **todos os 6 routers de domínio** (`auth`, `perfil`, `registros_diarios`, `registros_ciclo`, `respostas_objetivo`, `consentimentos`) e CORS restrito (`allow_origins=["http://10.0.2.2:8000", "http://localhost:8000"]`, `allow_credentials=False` — sem cookies, a autenticação é via header `Authorization: Bearer`), além das rotas originais `GET /` e `GET /health`. Todas as rotas de domínio da etapa 4 já existem (ver detalhamento abaixo) — 21 endpoints no total.
 - A etapa "Fundação do backend" (etapa 2 do plano) está implementada: `app/core/config.py` lê `DATABASE_URL` do `.env` (`sqlite:///./luna.db`); `app/db/base.py` e `app/db/session.py` configuram `Base`, `engine`, `SessionLocal` e `get_db()`; `app/models/` tem as 5 entidades da seção 8 (exceto `MensagemChat`, ainda pendente de decisão) mais `app/models/enums.py` com `HumorEnum` e `SintomaEnum`.
 - A etapa "Autenticação JWT no backend" (etapa 3) também está implementada:
   - `app/core/security.py` — hash de senha com `bcrypt` (`hash_senha`/`verificar_senha`) e criação/decodificação do JWT com `PyJWT` (`criar_access_token`/`decodificar_access_token`), usando `SECRET_KEY`, `ALGORITHM=HS256` e `ACCESS_TOKEN_EXPIRE_MINUTES=60` (sem refresh token por enquanto), configurados em `app/core/config.py` e no `.env` (a `SECRET_KEY` real só existe no `.env`, não versionado; `.env.example` tem um placeholder).
@@ -127,8 +132,8 @@ Estrutura de pacotes em `app/src/main/java/com/example/ic_app/`:
   - Tags dos routers renomeadas para nomes em português (`Autenticação`, `Perfil`, `Registros Diários`, `Registros do Ciclo`, `Respostas dos Objetivos`, `Consentimentos`, `Sistema` para `/` e `/health`), com `openapi_tags` descrevendo cada uma em `app/main.py`. Todos os 21 endpoints ganharam `summary`, `description`, `response_description` e `responses={...}` com os códigos não-2xx aplicáveis (401/404/409/422, conforme o caso); os filtros de query (`data_inicio`, `data_fim`, `objetivo`, `etapa`) ganharam descrição via `Query(..., description=...)`.
   - Todos os schemas de request/response ganharam exemplos via `json_schema_extra={"examples": [...]}` (Pydantic v2), sem alterar nenhuma validação ou tipo. `oauth2_scheme` em `app/dependencies.py` ganhou `description`/`scheme_name` explicando o Bearer JWT no Swagger — mudança só de metadado, o dependency `get_current_usuario` continua idêntico.
   - `backend/tests/test_openapi.py` (novo) cobre estruturalmente: `/openapi.json`/`/docs` acessíveis, presença das 7 tags e dos 13 paths implementados, esquema de segurança documentando "Bearer"/"JWT", ausência de `senha_hash`/`SECRET_KEY` em qualquer schema exposto, códigos de resposta documentados nos endpoints principais e presença de `security` nas rotas protegidas (e ausência nas públicas). `backend/tests/test_auth.py` ganhou dois testes que faltavam: token inválido e token expirado retornando 401.
-  - Suíte completa do backend: **146 testes** (3 health + 8 auth + 13 perfil + 37 registro diário + 38 registro de ciclo + 20 respostas de objetivo + 18 consentimento + 10 openapi), `pytest` a partir de `backend/`.
-- A etapa 4 (endpoints de domínio), **como originalmente delimitada na seção 11 — perfil, registro diário, registro de ciclo e respostas de objetivo —, está concluída em suas quatro partes**, e o módulo de `Consentimento` (que não fazia parte dessa lista original, mas é um domínio próprio desde a etapa 2, ver seção 8) também foi implementado, então **todas as entidades de domínio hoje modeladas têm endpoint**, com exceção de `MensagemChat` (ainda pendente de decisão, ver seção 8) e de qualquer cálculo de fase do ciclo ou previsão da próxima menstruação (`fase_calculada` permanece sempre `null`, por decisão explícita de escopo). Ainda não há: integração com o Android (`LoginScreen.kt`/`CriarConta.kt` continuam falando só com o Firebase, e `PerfilScreen.kt`/`RegistrarHojeScreen.kt`/`CalendarioScreen.kt`/telas de `objetivos/<objetivo>/`/`ConsentScreen.kt` ainda não chamam o backend — isso é a etapa 7/6) e nenhuma camada de rede no Android (etapa 5).
+  - Suíte completa do backend: **150 testes** (3 health + 8 auth + 15 perfil + 37 registro diário + 38 registro de ciclo + 22 respostas de objetivo + 17 consentimento + 10 openapi), `pytest` a partir de `backend/`.
+- A etapa 4 (endpoints de domínio), **como originalmente delimitada na seção 11 — perfil, registro diário, registro de ciclo e respostas de objetivo —, está concluída em suas quatro partes**, e o módulo de `Consentimento` (que não fazia parte dessa lista original, mas é um domínio próprio desde a etapa 2, ver seção 8) também foi implementado, então **todas as entidades de domínio hoje modeladas têm endpoint**, com exceção de `MensagemChat` (ainda pendente de decisão, ver seção 8) e de qualquer cálculo de fase do ciclo ou previsão da próxima menstruação (`fase_calculada` permanece sempre `null`, por decisão explícita de escopo). A integração com o Android está **parcial**: `LoginScreen.kt`/`CriarConta.kt` (etapa 7) e `RegistrarHojeScreen.kt` já chamam o backend via a camada de rede introduzida na etapa 5 (parcialmente concluída, ver seção 5). Ainda faltam `PerfilScreen.kt`/`CalendarioScreen.kt`/telas de `objetivos/<objetivo>/`/`ConsentScreen.kt` — apesar de os endpoints correspondentes já existirem e estarem testados no backend.
 
 ## 8. Entidades sugeridas para o banco de dados
 
@@ -168,9 +173,9 @@ Pontos a decidir junto com o usuário antes de modelar o schema definitivo:
 - Migração incremental, não "big bang": `AppScreen.kt` e o `when (telaAtual)` devem continuar funcionando enquanto backend e MVVM são introduzidos tela por tela. A troca para Navigation Compose é uma etapa própria (ver seção 11), só depois que o restante estiver estável.
 - Nenhuma dependência (Firebase ou qualquer outra) deve ser removida sem autorização explícita do usuário — mesmo depois de uma decisão de arquitetura tomada (ver seções 12 e 13), a remoção efetiva do código é um passo separado que precisa ser confirmado antes de ser executado.
 - Manter os nomes e textos em português e o padrão de callbacks (`onContinuarClick`, `onPularClick`, `onXClick`) já usado em todas as telas — código novo de rede/ViewModel deve seguir a mesma convenção.
-- Não corrigir bugs de UI/fluxo já mapeados (como as chaves `sintomas1`/`bemestar1` sem branch) como efeito colateral de uma tarefa de backend — são achados a resolver como tarefa própria, combinada com o usuário.
+- Não corrigir bugs de UI/fluxo já mapeados como efeito colateral de uma tarefa de backend — são achados a resolver como tarefa própria, combinada com o usuário (as chaves `sintomas1`/`bemestar1` sem branch e as telas `EntenderCorpoScreen2`/`3` órfãs já foram corrigidas dessa forma, ver seção 4).
 - Não introduzir Room ou outra persistência local sem necessidade explícita — o plano atual é ter o backend remoto como fonte de verdade; cache local só se for pedido depois.
-- Antes de alterar `objetivos/<objetivo>/Screen1..3`, `HumorItem.kt` ou `RegistroOpcaoCard.kt`, verificar as duplicações já mapeadas na seção 4 para não piorar a inconsistência existente.
+- `HumorItem` e `RegistroOpcaoCard` (em `components/`) são as versões canônicas — não recriar composables equivalentes soltos em outro lugar.
 
 ## 11. Plano de implementação por etapas
 
@@ -183,30 +188,28 @@ Pontos a decidir junto com o usuário antes de modelar o schema definitivo:
    - **(3) Registros do ciclo** *(concluído)* — `POST`/`GET`/`GET {id}`/`PATCH {id}`/`DELETE {id}` em `/registros-ciclo`, com `index=True` em `usuario_id` e unicidade `(usuario_id, data)` já aplicados (mesmo padrão de `RegistroDiario`). Cálculo de fase e previsão de ciclo (`fase_calculada`) foram deliberadamente deixados fora do escopo. Detalhes na seção 7.
    - **(4) Respostas dos objetivos** *(concluído)* — apenas `POST`/`GET` em `/respostas-objetivo` (sem `PATCH`/`DELETE`/consulta por id nesta etapa — o `POST` funciona como criação-ou-atualização), com `index=True` em `usuario_id` e unicidade `(usuario_id, objetivo, etapa)` já aplicados. Detalhes na seção 7.
    - **Consentimento** *(concluído, fora da ordem combinada original)* — apenas `POST`/`GET /atual` em `/consentimentos` (mesmo espírito de escopo reduzido de respostas de objetivo), com `index=True` em `usuario_id` e unicidade `(usuario_id, versao_termos)` já aplicados. Detalhes na seção 7.
-5. **Camada de rede no Android** — Retrofit + OkHttp, DTOs espelhando os schemas Pydantic, DataStore para o token JWT, interceptor de autenticação.
-6. **Refatoração para MVVM, tela por tela** — introduzir ViewModel e Repository por fluxo (autenticação primeiro, depois perfil, registro diário, calendário), migrando o estado hoje compartilhado via `AppScreen.kt`, sem quebrar a navegação existente.
-7. **Resolução do Firebase** — implementar a abordagem escolhida (ver seções 12 e 13) para `LoginScreen`/`CriarConta`, validar com testes manuais, e só então avaliar a remoção de dependências Firebase não usadas, com autorização explícita do usuário.
+5. **Camada de rede no Android** *(parcialmente concluída)* — Retrofit + OkHttp + DataStore para o token JWT já implementados e em uso para autenticação (`AuthApi`) e registro diário (`RegistroDiarioApi`), com DTOs espelhando os schemas Pydantic correspondentes. Faltam as `Api`/DTOs para perfil, registro de ciclo, respostas de objetivo e consentimento, e um interceptor OkHttp dedicado para anexar o token automaticamente (hoje o token é lido do DataStore e passado manualmente pelos ViewModels existentes).
+6. **Refatoração para MVVM, tela por tela** *(parcialmente concluída)* — `AuthViewModel`/`RegistroDiarioViewModel` já têm `AuthRepository`/`RegistroDiarioRepository` (ver seção 5); as demais telas (perfil, calendário, objetivos, consentimento) ainda não têm ViewModel nem Repository. Falta migrar as telas restantes, sem quebrar a navegação existente.
+7. **Resolução do Firebase** *(concluída no Android; pendente no backend)* — `LoginScreen`/`CriarConta` já chamam o backend próprio via `AuthViewModel`, `FirebaseAuth` não é mais usado, e o plugin gms + `google-services.json` já foram removidos do Android (com autorização explícita, ver seção 6). Falta apenas remover `firebase_admin`/bibliotecas do Firestore de `backend/requirements.txt`, com autorização explícita do usuário.
 8. **Migração para Navigation Compose** — trocar o `when (telaAtual)` por um `NavHost`, preservando as mesmas transições de tela já mapeadas.
 9. **Testes e revisão** — testes unitários de ViewModel/Repository, testes instrumentados dos fluxos críticos (cadastro/login, registro diário), tratamento de erro de rede e estados de carregamento nas telas migradas.
 
 Cada etapa deve ser confirmada com o usuário antes de avançar para a próxima.
 
-## 12. Comparação entre Firebase Auth e autenticação própria com JWT
+## 12. Comparação entre Firebase Auth e autenticação própria com JWT *(decisão já executada na prática — seção mantida como registro histórico)*
 
-Hoje `CriarConta.kt` já usa `FirebaseAuth` de fato para cadastro; `LoginScreen.kt` não usa nada de fato (ver seção 6). O plano de backend em FastAPI + JWT + SQLAlchemy exige uma tabela `Usuario` própria, para relacionar com `RegistroDiario`, `RegistroCiclo` etc., e um jeito de emitir/validar sessão — o que entra em conflito com manter o Firebase Auth como única fonte de identidade.
+Esta seção documentava a decisão a ser tomada antes de `CriarConta.kt`/`LoginScreen.kt` serem migrados. **Essa migração já aconteceu no código**: ambas as telas chamam o backend próprio via `AuthViewModel`, e `FirebaseAuth` não é mais invocado em nenhum lugar (ver seção 6). O texto abaixo é preservado como registro do raciocínio original.
 
-**Opção A — Backend valida tokens do Firebase.**
-Mantém `FirebaseAuth` no Android como está; o backend usa `firebase_admin` (já presente em `requirements.txt`, hoje sem uso) para verificar o ID token do Firebase em cada requisição e resolve/cria o `Usuario` correspondente localmente.
-- Vantagem: reaproveita o `CriarConta.kt` que já funciona, evita implementar hash de senha e emissão de token no backend.
-- Desvantagem: mantém duas dependências de identidade (Firebase e backend), complica testes locais sem depender de um serviço externo, e ainda exige lógica própria de `Usuario` no backend de qualquer forma.
+Antes da migração, `CriarConta.kt` usava `FirebaseAuth` de fato para cadastro; `LoginScreen.kt` não usava nada de fato. O plano de backend em FastAPI + JWT + SQLAlchemy exige uma tabela `Usuario` própria, para relacionar com `RegistroDiario`, `RegistroCiclo` etc., e um jeito de emitir/validar sessão — o que entrava em conflito com manter o Firebase Auth como única fonte de identidade.
 
-**Opção B — Migrar totalmente para autenticação própria (JWT + SQLAlchemy).**
-`CriarConta`/`LoginScreen` passam a chamar endpoints do próprio backend via Retrofit; o backend guarda `senha_hash` e emite o JWT. As dependências Firebase (`firebase-auth`, `firebase-firestore`, `google-services.json`, `firebase_admin` no backend) só seriam removidas depois de validada a migração e com autorização explícita do usuário (ver seção 10).
-- Vantagem: fonte única de verdade para usuário e dados, alinhada ao restante do plano (SQLAlchemy, JWT, MVVM, Retrofit), sem depender de infraestrutura externa.
-- Desvantagem: exige reescrever a lógica de `CriarConta.kt`, hoje funcional, para chamar o backend em vez do Firebase.
+**Opção A — Backend valida tokens do Firebase.** *(não escolhida)*
+Manteria `FirebaseAuth` no Android como estava; o backend usaria `firebase_admin` (presente em `requirements.txt`, sem uso) para verificar o ID token do Firebase em cada requisição e resolver/criar o `Usuario` correspondente localmente.
 
-## 13. Recomendação da estratégia de autenticação
+**Opção B — Migrar totalmente para autenticação própria (JWT + SQLAlchemy).** *(escolhida e implementada)*
+`CriarConta`/`LoginScreen` passaram a chamar endpoints do próprio backend via Retrofit; o backend guarda `senha_hash` e emite o JWT. No Android, o plugin gms e `google-services.json` já foram removidos (com autorização explícita); no backend, `firebase_admin` ainda está em `requirements.txt`, pendente de autorização explícita para a remoção formal (ver seção 10).
 
-Recomenda-se a Opção B (autenticação própria com JWT). Como o plano já prevê um backend próprio com SQLAlchemy para todas as demais entidades (perfil, registros diários, ciclo, respostas de objetivo), manter o Firebase apenas para autenticação criaria duas fontes de identidade (uid do Firebase vs. id interno de `Usuario`) sem necessidade real: o Firestore já não é usado, e o cadastro via Firebase hoje é a única peça funcional que se perderia, contra o ganho de ter um único fluxo de autenticação consistente com o restante do sistema.
+## 13. Recomendação da estratégia de autenticação *(recomendação seguida — decisão executada)*
 
-Importante: esta é uma recomendação, não uma decisão executada. Nenhuma dependência do Firebase deve ser removida, nem `CriarConta.kt`/`LoginScreen.kt` alterados para deixar de usar o Firebase, sem autorização explícita do usuário no momento da implementação (ver seção 10).
+A Opção B (autenticação própria com JWT) foi adotada e implementada. Como o plano já previa um backend próprio com SQLAlchemy para todas as demais entidades (perfil, registros diários, ciclo, respostas de objetivo), manter o Firebase apenas para autenticação criaria duas fontes de identidade (uid do Firebase vs. id interno de `Usuario`) sem necessidade real: o Firestore nunca foi usado, e o cadastro via Firebase era a única peça funcional que se perderia, contra o ganho de ter um único fluxo de autenticação consistente com o restante do sistema — ganho já concretizado.
+
+A limpeza do lado Android já foi feita (plugin gms + `google-services.json` removidos, com autorização explícita). Falta apenas `firebase_admin` e bibliotecas do Firestore em `backend/requirements.txt`, que continuam presentes como dependência órfã e só devem ser removidas com autorização explícita do usuário no momento da execução (ver seção 10).
