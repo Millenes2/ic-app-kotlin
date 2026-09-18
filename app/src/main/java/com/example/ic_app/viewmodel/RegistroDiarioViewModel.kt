@@ -3,7 +3,6 @@ package com.example.ic_app.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.repository.RegistroDiarioRepository
 import com.example.ic_app.repository.RegistroDiarioResultado
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +18,7 @@ sealed interface RegistroDiarioUiState {
 
 class RegistroDiarioViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = RegistroDiarioRepository(sessaoDataStore = SessaoDataStore(application))
+    private val repository = RegistroDiarioRepository()
 
     private val _estado = MutableStateFlow<RegistroDiarioUiState>(RegistroDiarioUiState.Idle)
     val estado: StateFlow<RegistroDiarioUiState> = _estado

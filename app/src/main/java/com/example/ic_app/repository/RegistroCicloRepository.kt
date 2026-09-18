@@ -1,10 +1,8 @@
 package com.example.ic_app.repository
 
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.data.remote.RegistroCicloApi
 import com.example.ic_app.data.remote.RetrofitClient
 import com.example.ic_app.data.remote.dto.RegistroCicloCreateRequest
-import kotlinx.coroutines.flow.first
 import java.io.IOException
 
 sealed interface RegistroCicloResultado {
@@ -13,8 +11,9 @@ sealed interface RegistroCicloResultado {
 }
 
 /**
- * Fonte única de verdade para o registro de ciclo: fala com [RegistroCicloApi]
- * usando o token salvo em [SessaoDataStore].
+ * Fonte única de verdade para o registro de ciclo: fala com
+ * [RegistroCicloApi] (o header Authorization é anexado automaticamente por
+ * RetrofitClient).
  *
  * `CalendarioScreen.kt` hoje exibe uma semana fixa fictícia (ver CLAUDE.md
  * seção 4) sem correspondência real com o calendário do dispositivo; por
@@ -24,17 +23,12 @@ sealed interface RegistroCicloResultado {
  * escopo desta integração.
  */
 class RegistroCicloRepository(
-    private val sessaoDataStore: SessaoDataStore,
     private val api: RegistroCicloApi = RetrofitClient.registroCicloApi
 ) {
 
     suspend fun salvar(data: String, menstruacao: Boolean, observacao: String?): RegistroCicloResultado {
-        val token = sessaoDataStore.tokenFlow.first()
-            ?: return RegistroCicloResultado.Erro("Sessão expirada, faça login novamente")
-
         return try {
             val resposta = api.criar(
-                "Bearer $token",
                 RegistroCicloCreateRequest(
                     data = data,
                     menstruacao = menstruacao,

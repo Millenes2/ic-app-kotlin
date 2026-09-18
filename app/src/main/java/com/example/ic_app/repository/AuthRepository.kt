@@ -6,7 +6,6 @@ import com.example.ic_app.data.remote.RetrofitClient
 import com.example.ic_app.data.remote.dto.LoginRequest
 import com.example.ic_app.data.remote.dto.UsuarioCreateRequest
 import com.example.ic_app.data.remote.dto.UsuarioResponse
-import kotlinx.coroutines.flow.first
 import java.io.IOException
 
 sealed interface AuthResultado {
@@ -63,15 +62,15 @@ class AuthRepository(
     }
 
     /**
-     * Busca o usuário autenticado em GET /auth/me usando o token salvo no
+     * Busca o usuário autenticado em GET /auth/me — o header Authorization é
+     * anexado automaticamente por RetrofitClient a partir do token salvo no
      * DataStore. Existe só para comprovar, na prática, que o JWT armazenado
      * após login/registro é aceito pelo backend em uma rota protegida
      * (evidência de autenticação ponta a ponta) — não é chamada por nenhuma
      * tela hoje.
      */
     suspend fun buscarUsuarioAutenticado(): UsuarioResponse? {
-        val token = sessaoDataStore.tokenFlow.first() ?: return null
-        val resposta = api.me("Bearer $token")
+        val resposta = api.me()
         return if (resposta.isSuccessful) resposta.body() else null
     }
 }

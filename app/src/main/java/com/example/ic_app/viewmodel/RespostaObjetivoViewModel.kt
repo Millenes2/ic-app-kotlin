@@ -3,7 +3,6 @@ package com.example.ic_app.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.repository.RespostaObjetivoRepository
 import kotlinx.coroutines.launch
 
@@ -15,7 +14,7 @@ import kotlinx.coroutines.launch
  */
 class RespostaObjetivoViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = RespostaObjetivoRepository(sessaoDataStore = SessaoDataStore(application))
+    private val repository = RespostaObjetivoRepository()
 
     fun salvar(objetivo: String, etapa: Int, opcaoSelecionada: String) {
         if (objetivo.isBlank() || opcaoSelecionada.isBlank()) return

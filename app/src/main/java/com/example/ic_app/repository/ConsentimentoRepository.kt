@@ -1,10 +1,8 @@
 package com.example.ic_app.repository
 
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.data.remote.ConsentimentoApi
 import com.example.ic_app.data.remote.RetrofitClient
 import com.example.ic_app.data.remote.dto.ConsentimentoCreateRequest
-import kotlinx.coroutines.flow.first
 import java.io.IOException
 
 /**
@@ -24,27 +22,22 @@ sealed interface ConsentimentoResultado {
 
 /**
  * Fonte única de verdade para o consentimento: fala com [ConsentimentoApi]
- * usando o token salvo em [SessaoDataStore].
+ * (o header Authorization é anexado automaticamente por RetrofitClient,
+ * quando há sessão ativa).
  *
  * Assim como em [RespostaObjetivoRepository], `ConsentScreen` é exibida no
  * início do onboarding, antes de qualquer login/cadastro — sem sessão ativa,
+ * a requisição segue sem o header e o backend responde 401, então
  * [registrar] sempre retorna [ConsentimentoResultado.Erro]. A chamada é
  * "melhor esforço": não bloqueia o avanço do onboarding.
  */
 class ConsentimentoRepository(
-    private val sessaoDataStore: SessaoDataStore,
     private val api: ConsentimentoApi = RetrofitClient.consentimentoApi
 ) {
 
     suspend fun registrar(versaoTermos: String = VERSAO_TERMOS_ATUAL): ConsentimentoResultado {
-        val token = sessaoDataStore.tokenFlow.first()
-            ?: return ConsentimentoResultado.Erro("Sessão expirada, faça login novamente")
-
         return try {
-            val resposta = api.registrar(
-                "Bearer $token",
-                ConsentimentoCreateRequest(versaoTermos = versaoTermos)
-            )
+            val resposta = api.registrar(ConsentimentoCreateRequest(versaoTermos = versaoTermos))
             if (resposta.isSuccessful) {
                 ConsentimentoResultado.Sucesso
             } else {

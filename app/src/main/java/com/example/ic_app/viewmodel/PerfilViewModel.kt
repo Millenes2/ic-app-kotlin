@@ -3,7 +3,6 @@ package com.example.ic_app.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.data.remote.dto.UsuarioResponse
 import com.example.ic_app.repository.PerfilRepository
 import com.example.ic_app.repository.PerfilResultado
@@ -33,7 +32,7 @@ sealed interface PerfilSalvarEvento {
 
 class PerfilViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = PerfilRepository(sessaoDataStore = SessaoDataStore(application))
+    private val repository = PerfilRepository()
 
     private val _estado = MutableStateFlow<PerfilUiState>(PerfilUiState.Idle)
     val estado: StateFlow<PerfilUiState> = _estado

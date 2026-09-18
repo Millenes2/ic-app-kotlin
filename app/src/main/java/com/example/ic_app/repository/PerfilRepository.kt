@@ -1,11 +1,9 @@
 package com.example.ic_app.repository
 
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.data.remote.PerfilApi
 import com.example.ic_app.data.remote.RetrofitClient
 import com.example.ic_app.data.remote.dto.PerfilUpdateRequest
 import com.example.ic_app.data.remote.dto.UsuarioResponse
-import kotlinx.coroutines.flow.first
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -16,14 +14,13 @@ sealed interface PerfilResultado {
 }
 
 /**
- * Fonte única de verdade para o perfil: fala com [PerfilApi] usando o token
- * salvo em [SessaoDataStore]. `nomeUsuario`/`dataNascimentoUsuario`/
- * `pesoUsuario` em AppScreen.kt continuam sendo o estado local exibido antes
- * do primeiro carregamento (ver PerfilScreen.kt) — este repository só entra
- * em cena quando há sessão ativa.
+ * Fonte única de verdade para o perfil: fala com [PerfilApi] (o header
+ * Authorization é anexado automaticamente por RetrofitClient).
+ * `nomeUsuario`/`dataNascimentoUsuario`/`pesoUsuario` em AppScreen.kt
+ * continuam sendo o estado local exibido antes do primeiro carregamento (ver
+ * PerfilScreen.kt) — este repository só entra em cena quando há sessão ativa.
  */
 class PerfilRepository(
-    private val sessaoDataStore: SessaoDataStore,
     private val api: PerfilApi = RetrofitClient.perfilApi
 ) {
     private val formatoTelaBr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
@@ -32,8 +29,7 @@ class PerfilRepository(
     private val formatoBackendIso = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
     suspend fun buscar(): UsuarioResponse? {
-        val token = sessaoDataStore.tokenFlow.first() ?: return null
-        val resposta = api.buscar("Bearer $token")
+        val resposta = api.buscar()
         return if (resposta.isSuccessful) resposta.body() else null
     }
 
@@ -50,9 +46,6 @@ class PerfilRepository(
         peso: String,
         objetivoAtual: String
     ): PerfilResultado {
-        val token = sessaoDataStore.tokenFlow.first()
-            ?: return PerfilResultado.Erro("Sessão expirada, faça login novamente")
-
         val dataIso = if (dataNascimento.isBlank()) {
             null
         } else {
@@ -72,7 +65,6 @@ class PerfilRepository(
 
         return try {
             val resposta = api.atualizar(
-                "Bearer $token",
                 PerfilUpdateRequest(
                     nome = nome.ifBlank { null },
                     dataNascimento = dataIso,

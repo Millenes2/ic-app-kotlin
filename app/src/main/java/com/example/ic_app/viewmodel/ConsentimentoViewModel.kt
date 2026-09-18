@@ -3,7 +3,6 @@ package com.example.ic_app.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ic_app.data.local.SessaoDataStore
 import com.example.ic_app.repository.ConsentimentoRepository
 import kotlinx.coroutines.launch
 
@@ -14,7 +13,7 @@ import kotlinx.coroutines.launch
  */
 class ConsentimentoViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ConsentimentoRepository(sessaoDataStore = SessaoDataStore(application))
+    private val repository = ConsentimentoRepository()
 
     fun registrar() {
         viewModelScope.launch {
