@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.auth.CriarConta
+import com.example.ic_app.viewmodel.RespostaObjetivoViewModel
 import com.example.ic_app.objetivos.bemestar.BemEstarScreen1
 import com.example.ic_app.objetivos.bemestar.BemEstarScreen2
 import com.example.ic_app.objetivos.bemestar.BemEstarScreen3
@@ -47,6 +49,7 @@ fun AppScreen() {
     var objetivoUsuario by remember { mutableStateOf("") }//guarda o objetivo que eu escolhi na tela de objetivo
     var dataNascimentoUsuario by remember { mutableStateOf("") }
     var pesoUsuario by remember { mutableStateOf("") }
+    val respostaObjetivoViewModel: RespostaObjetivoViewModel = viewModel()
 
     //Scaffold é um layout que contém um topo, um conteúdo e um rodapé
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->//innerPadding é o padding interno da tela
@@ -138,7 +141,8 @@ fun AppScreen() {
             // Monitorar meu ciclo
             "regularidade1" -> RegularidadeScreen(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "regularidade2"
                 },
                 onPularClick = {
@@ -148,7 +152,8 @@ fun AppScreen() {
 
             "regularidade2" -> RegularidadeScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "regularidade3"
                 },
                 onPularClick = {
@@ -158,7 +163,8 @@ fun AppScreen() {
 
             "regularidade3" -> RegularidadeScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -169,7 +175,8 @@ fun AppScreen() {
             // Acompanhar sintomas
             "sintomas1" -> SintomasScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "sintomas2"
                 },
                 onPularClick = {
@@ -179,7 +186,8 @@ fun AppScreen() {
 
             "sintomas2" -> SintomasScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "sintomas3"
                 },
                 onPularClick = {
@@ -189,7 +197,8 @@ fun AppScreen() {
 
             "sintomas3" -> SintomasScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -200,7 +209,8 @@ fun AppScreen() {
             // Entender meu corpo
             "entender1" -> EntenderCorpoScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "entender2"
                 },
                 onPularClick = {
@@ -210,7 +220,8 @@ fun AppScreen() {
 
             "entender2" -> EntenderCorpoScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "entender3"
                 },
                 onPularClick = {
@@ -220,7 +231,8 @@ fun AppScreen() {
 
             "entender3" -> EntenderCorpoScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -231,7 +243,8 @@ fun AppScreen() {
             // Melhorar meu bem-estar
             "bemestar1" -> BemEstarScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "bemestar2"
                 },
                 onPularClick = {
@@ -241,7 +254,8 @@ fun AppScreen() {
 
             "bemestar2" -> BemEstarScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "bemestar3"
                 },
                 onPularClick = {
@@ -251,7 +265,8 @@ fun AppScreen() {
 
             "bemestar3" -> BemEstarScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -262,7 +277,8 @@ fun AppScreen() {
             // Engravidar
             "engravidar1" -> EngravidarScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "engravidar2"
                 },
                 onPularClick = {
@@ -272,7 +288,8 @@ fun AppScreen() {
 
             "engravidar2" -> EngravidarScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "engravidar3"
                 },
                 onPularClick = {
@@ -282,7 +299,8 @@ fun AppScreen() {
 
             "engravidar3" -> EngravidarScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -293,7 +311,8 @@ fun AppScreen() {
             // Acompanhar minha gestação
             "gestacao1" -> GestacaoScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "gestacao2"
                 },
                 onPularClick = {
@@ -303,7 +322,8 @@ fun AppScreen() {
 
             "gestacao2" -> GestacaoScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "gestacao3"
                 },
                 onPularClick = {
@@ -313,7 +333,8 @@ fun AppScreen() {
 
             "gestacao3" -> GestacaoScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
@@ -324,7 +345,8 @@ fun AppScreen() {
             // Melhorar minha saúde mental
             "saudemental1" -> SaudeMentalScreen1(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 1, opcao)
                     telaAtual = "saudemental2"
                 },
                 onPularClick = {
@@ -334,7 +356,8 @@ fun AppScreen() {
 
             "saudemental2" -> SaudeMentalScreen2(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 2, opcao)
                     telaAtual = "saudemental3"
                 },
                 onPularClick = {
@@ -344,7 +367,8 @@ fun AppScreen() {
 
             "saudemental3" -> SaudeMentalScreen3(
                 modifier = Modifier.padding(innerPadding),
-                onContinuarClick = {
+                onContinuarClick = { opcao ->
+                    respostaObjetivoViewModel.salvar(objetivoUsuario, 3, opcao)
                     telaAtual = "home"
                 },
                 onPularClick = {
