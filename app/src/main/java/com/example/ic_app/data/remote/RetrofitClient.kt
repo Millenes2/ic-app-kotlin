@@ -30,4 +30,8 @@ object RetrofitClient {
 
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
     val registroDiarioApi: RegistroDiarioApi = retrofit.create(RegistroDiarioApi::class.java)
+    val perfilApi: PerfilApi = retrofit.create(PerfilApi::class.java)
+    val registroCicloApi: RegistroCicloApi = retrofit.create(RegistroCicloApi::class.java)
+    val respostaObjetivoApi: RespostaObjetivoApi = retrofit.create(RespostaObjetivoApi::class.java)
+    val consentimentoApi: ConsentimentoApi = retrofit.create(ConsentimentoApi::class.java)
 }
