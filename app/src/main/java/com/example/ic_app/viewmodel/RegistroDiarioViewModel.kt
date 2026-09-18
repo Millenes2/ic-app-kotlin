@@ -4,16 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ic_app.data.local.SessaoDataStore
-import com.example.ic_app.data.remote.RetrofitClient
-import com.example.ic_app.data.remote.dto.ErroDetalhe
-import com.example.ic_app.data.remote.dto.RegistroDiarioCreateRequest
-import com.google.gson.Gson
+import com.example.ic_app.repository.RegistroDiarioRepository
+import com.example.ic_app.repository.RegistroDiarioResultado
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import retrofit2.Response
-import java.io.IOException
 
 sealed interface RegistroDiarioUiState {
     data object Idle : RegistroDiarioUiState
@@ -24,9 +19,7 @@ sealed interface RegistroDiarioUiState {
 
 class RegistroDiarioViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val api = RetrofitClient.registroDiarioApi
-    private val sessaoDataStore = SessaoDataStore(application)
-    private val gson = Gson()
+    private val repository = RegistroDiarioRepository(sessaoDataStore = SessaoDataStore(application))
 
     private val _estado = MutableStateFlow<RegistroDiarioUiState>(RegistroDiarioUiState.Idle)
     val estado: StateFlow<RegistroDiarioUiState> = _estado
@@ -34,39 +27,12 @@ class RegistroDiarioViewModel(application: Application) : AndroidViewModel(appli
     fun salvar(data: String, humor: String?, sintomaPrincipal: String?, observacao: String?) {
         _estado.value = RegistroDiarioUiState.Carregando
         viewModelScope.launch {
-            val token = sessaoDataStore.tokenFlow.first()
-            if (token == null) {
-                _estado.value = RegistroDiarioUiState.Erro("Sessão expirada, faça login novamente")
-                return@launch
+            _estado.value = when (
+                val resultado = repository.salvar(data, humor, sintomaPrincipal, observacao)
+            ) {
+                is RegistroDiarioResultado.Sucesso -> RegistroDiarioUiState.Sucesso
+                is RegistroDiarioResultado.Erro -> RegistroDiarioUiState.Erro(resultado.mensagem)
             }
-            try {
-                val resposta = api.criar(
-                    "Bearer $token",
-                    RegistroDiarioCreateRequest(
-                        data = data,
-                        humor = humor,
-                        sintomaPrincipal = sintomaPrincipal,
-                        observacao = observacao
-                    )
-                )
-                if (resposta.isSuccessful) {
-                    _estado.value = RegistroDiarioUiState.Sucesso
-                } else {
-                    _estado.value = RegistroDiarioUiState.Erro(extrairMensagemDeErro(resposta))
-                }
-            } catch (erro: IOException) {
-                _estado.value = RegistroDiarioUiState.Erro("Não foi possível conectar ao servidor")
-            }
-        }
-    }
-
-    private fun extrairMensagemDeErro(resposta: Response<*>): String {
-        val corpo = resposta.errorBody()?.string()
-        return try {
-            gson.fromJson(corpo, ErroDetalhe::class.java)?.detail
-                ?: "Erro inesperado (${resposta.code()})"
-        } catch (erro: Exception) {
-            "Erro inesperado (${resposta.code()})"
         }
     }
 }
