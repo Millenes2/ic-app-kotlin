@@ -11,7 +11,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.PerfilSalvarEvento
+import com.example.ic_app.viewmodel.PerfilUiState
+import com.example.ic_app.viewmodel.PerfilViewModel
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun PerfilScreen(
@@ -20,12 +26,48 @@ fun PerfilScreen(
     dataNascimentoUsuario: String,
     pesoUsuario: String,
     objetivoUsuario: String,
-    onVoltarHomeClick: () -> Unit
+    onVoltarHomeClick: () -> Unit,
+    viewModel: PerfilViewModel = viewModel()
 ) {
     var nome by remember { mutableStateOf(nomeUsuario) }
     var dataNascimento by remember { mutableStateOf(dataNascimentoUsuario) }
     var peso by remember { mutableStateOf(pesoUsuario) }
     var objetivo by remember { mutableStateOf(objetivoUsuario) }
+    var mensagemErro by remember { mutableStateOf("") }
+    val estado by viewModel.estado.collectAsState()
+    val eventoSalvar by viewModel.eventoSalvar.collectAsState()
+    val salvando = eventoSalvar is PerfilSalvarEvento.Salvando
+
+    // Ao abrir a tela, tenta carregar o perfil real do backend (se houver
+    // sessão ativa) para substituir o estado local só em memória.
+    LaunchedEffect(Unit) {
+        viewModel.carregar()
+    }
+
+    LaunchedEffect(estado) {
+        when (val estadoAtual = estado) {
+            is PerfilUiState.Sucesso -> {
+                nome = estadoAtual.usuario.nome
+                dataNascimento = estadoAtual.usuario.dataNascimento?.let { converterDataIsoParaBr(it) } ?: dataNascimento
+                peso = estadoAtual.usuario.peso?.toString() ?: peso
+                objetivo = estadoAtual.usuario.objetivoAtual ?: objetivo
+            }
+            is PerfilUiState.Erro -> mensagemErro = estadoAtual.mensagem
+            else -> {}
+        }
+    }
+
+    // Resultado do "Salvar alterações" (PATCH /perfil) é um evento separado de
+    // `estado`: só ele deve navegar de volta à home ou exibir erro de
+    // salvamento — `estado` também é usado por `carregar()` (ver acima), que
+    // não deve disparar navegação.
+    LaunchedEffect(eventoSalvar) {
+        when (val eventoAtual = eventoSalvar) {
+            is PerfilSalvarEvento.Salvo -> onVoltarHomeClick()
+            is PerfilSalvarEvento.Erro -> mensagemErro = eventoAtual.mensagem
+            else -> {}
+        }
+    }
 
     val fundo = Color(0xFFFFF9FB)
     val rosaPremium = Color(0xFFD86C9E)
@@ -76,8 +118,21 @@ fun PerfilScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        if (mensagemErro.isNotBlank()) {
+            Text(
+                text = mensagemErro,
+                color = Color(0xFFB00020),
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         Button(
-            onClick = onVoltarHomeClick,
+            onClick = {
+                mensagemErro = ""
+                viewModel.salvar(nome, dataNascimento, peso, objetivo)
+            },
+            enabled = !salvando,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -85,12 +140,29 @@ fun PerfilScreen(
             colors = ButtonDefaults.buttonColors(containerColor = rosaPremium)
         ) {
             Text(
-                text = "Salvar alterações",
+                text = if (salvando) "Salvando..." else "Salvar alterações",
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
             )
         }
+    }
+}
+
+/**
+ * Inverso de `PerfilRepository.formatoBackendIso`/`formatoTelaBr`: converte a
+ * data ISO ("yyyy-MM-dd") devolvida por `GET /perfil` para o formato
+ * "dd/MM/yyyy" já usado por `dataNascimentoUsuario`/`DataNascimentoScreen.kt`.
+ * Em caso de valor inesperado, devolve a string original em vez de quebrar a
+ * tela (fallback seguro).
+ */
+private fun converterDataIsoParaBr(dataIso: String): String {
+    val formatoIso = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    val formatoBr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    return try {
+        formatoBr.format(formatoIso.parse(dataIso)!!)
+    } catch (erro: Exception) {
+        dataIso
     }
 }
 
