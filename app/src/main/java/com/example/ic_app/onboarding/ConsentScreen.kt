@@ -13,13 +13,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ic_app.ui.theme.Ic_appTheme
+import com.example.ic_app.viewmodel.ConsentimentoViewModel
 
 @Composable //função composta
 fun ConsentScreen(//função que vai ser composta
     modifier: Modifier = Modifier, // Modifier serve para configurar aparencia/posição/tamanho
     //toda vez temos que passar como parametro para devifinir , cor, altura e etc.
-    onContinuarClick: () -> Unit
+    onContinuarClick: () -> Unit,
+    viewModel: ConsentimentoViewModel = viewModel()
 ) {
     var consentimentoMarcado by remember { mutableStateOf(false) }
     var mostrarDialog by remember { mutableStateOf(false) }
@@ -193,7 +196,15 @@ fun ConsentScreen(//função que vai ser composta
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = onContinuarClick,
+                    onClick = {
+                        // Registro "melhor esforço" (ver ConsentimentoRepository): nesta
+                        // etapa do onboarding ainda não há sessão ativa, então
+                        // POST /consentimentos normalmente falha com 401 — a navegação
+                        // não é bloqueada por isso, do mesmo jeito que hoje não é
+                        // bloqueada por nada.
+                        viewModel.registrar()
+                        onContinuarClick()
+                    },
                     enabled = consentimentoMarcado,
                     modifier = Modifier
                         .fillMaxWidth()
