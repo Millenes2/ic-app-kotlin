@@ -111,6 +111,28 @@ def test_patch_perfil_objetivo_invalido(client):
     assert resposta.status_code == 422
 
 
+def test_patch_perfil_aceita_acompanhar_sintomas(client):
+    headers = registrar_e_logar(client, USUARIO_TESTE)
+
+    resposta = client.patch(
+        "/perfil", headers=headers, json={"objetivo_atual": "Acompanhar sintomas"}
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json()["objetivo_atual"] == "Acompanhar sintomas"
+
+
+def test_patch_perfil_aceita_melhorar_bem_estar(client):
+    headers = registrar_e_logar(client, USUARIO_TESTE)
+
+    resposta = client.patch(
+        "/perfil", headers=headers, json={"objetivo_atual": "Melhorar meu bem-estar"}
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json()["objetivo_atual"] == "Melhorar meu bem-estar"
+
+
 def test_patch_perfil_idade_abaixo_do_minimo(client):
     headers = registrar_e_logar(client, USUARIO_TESTE)
     nascimento = data_com_idade(11).isoformat()

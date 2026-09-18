@@ -3,11 +3,13 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-# Valores exibidos em ObjetivoScreen.kt (os 5 cards) mais "Geral", gravado quando
+# Valores exibidos em ObjetivoScreen.kt (os 7 cards) mais "Geral", gravado quando
 # o usuário toca em "Pular" nesse mesmo fluxo (ver AppScreen.kt).
 OBJETIVOS_VALIDOS = {
     "Monitorar meu ciclo",
+    "Acompanhar sintomas",
     "Entender meu corpo",
+    "Melhorar meu bem-estar",
     "Engravidar",
     "Acompanhar minha Gestação",
     "Melhorar minha Saúde Mental",

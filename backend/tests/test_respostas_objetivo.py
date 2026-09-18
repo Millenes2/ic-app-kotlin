@@ -194,6 +194,32 @@ def test_post_resposta_objetivo_invalido(client):
     assert resposta.status_code == 422
 
 
+def test_post_resposta_aceita_acompanhar_sintomas(client):
+    headers = registrar_e_logar(client, USUARIO_TESTE)
+
+    resposta = client.post(
+        "/respostas-objetivo",
+        headers=headers,
+        json={"objetivo": "Acompanhar sintomas", "etapa": 1, "opcao_selecionada": "Cólicas"},
+    )
+
+    assert resposta.status_code == 201
+    assert resposta.json()["objetivo"] == "Acompanhar sintomas"
+
+
+def test_post_resposta_aceita_melhorar_bem_estar(client):
+    headers = registrar_e_logar(client, USUARIO_TESTE)
+
+    resposta = client.post(
+        "/respostas-objetivo",
+        headers=headers,
+        json={"objetivo": "Melhorar meu bem-estar", "etapa": 1, "opcao_selecionada": "Sono"},
+    )
+
+    assert resposta.status_code == 201
+    assert resposta.json()["objetivo"] == "Melhorar meu bem-estar"
+
+
 def test_post_resposta_etapa_invalida(client):
     headers = registrar_e_logar(client, USUARIO_TESTE)
 

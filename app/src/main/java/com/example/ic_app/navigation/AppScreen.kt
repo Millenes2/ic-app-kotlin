@@ -6,10 +6,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.ic_app.auth.CriarConta
+import com.example.ic_app.objetivos.bemestar.BemEstarScreen1
+import com.example.ic_app.objetivos.bemestar.BemEstarScreen2
+import com.example.ic_app.objetivos.bemestar.BemEstarScreen3
 import com.example.ic_app.objetivos.engravidar.EngravidarScreen1
 import com.example.ic_app.objetivos.engravidar.EngravidarScreen2
 import com.example.ic_app.objetivos.engravidar.EngravidarScreen3
 import com.example.ic_app.objetivos.entender_corpo.EntenderCorpoScreen1
+import com.example.ic_app.objetivos.entender_corpo.EntenderCorpoScreen2
+import com.example.ic_app.objetivos.entender_corpo.EntenderCorpoScreen3
+import com.example.ic_app.objetivos.sintomas.SintomasScreen1
+import com.example.ic_app.objetivos.sintomas.SintomasScreen2
+import com.example.ic_app.objetivos.sintomas.SintomasScreen3
 import com.example.ic_app.objetivos.gestacao.GestacaoScreen1
 import com.example.ic_app.objetivos.gestacao.GestacaoScreen2
 import com.example.ic_app.objetivos.gestacao.GestacaoScreen3
@@ -158,8 +166,90 @@ fun AppScreen() {
                 }
             )
 
+            // Acompanhar sintomas
+            "sintomas1" -> SintomasScreen1(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "sintomas2"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "sintomas2" -> SintomasScreen2(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "sintomas3"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "sintomas3" -> SintomasScreen3(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "home"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
             // Entender meu corpo
             "entender1" -> EntenderCorpoScreen1(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "entender2"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "entender2" -> EntenderCorpoScreen2(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "entender3"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "entender3" -> EntenderCorpoScreen3(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "home"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            // Melhorar meu bem-estar
+            "bemestar1" -> BemEstarScreen1(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "bemestar2"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "bemestar2" -> BemEstarScreen2(
+                modifier = Modifier.padding(innerPadding),
+                onContinuarClick = {
+                    telaAtual = "bemestar3"
+                },
+                onPularClick = {
+                    telaAtual = "home"
+                }
+            )
+
+            "bemestar3" -> BemEstarScreen3(
                 modifier = Modifier.padding(innerPadding),
                 onContinuarClick = {
                     telaAtual = "home"
@@ -285,15 +375,6 @@ fun AppScreen() {
                     telaAtual = "login"
                 }
             )
-
-            "chat" -> ChatLunaScreen(
-                modifier = Modifier.padding(innerPadding),
-                nomeUsuario = nomeUsuario,
-                onVoltarHomeClick = {
-                    telaAtual = "home"
-                }
-            )
-
 
             "calendario" -> CalendarioScreen(
                 modifier = Modifier.padding(innerPadding),

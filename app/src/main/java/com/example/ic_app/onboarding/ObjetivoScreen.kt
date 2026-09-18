@@ -84,10 +84,28 @@ fun ObjetivoScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             ObjetivoCard(
+                titulo = "Acompanhar sintomas",
+                icone = "\uD83D\uDCCB",
+                selecionado = objetivoSelecionado == "Acompanhar sintomas",
+                onClick = { objetivoSelecionado = "Acompanhar sintomas" }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ObjetivoCard(
                 titulo = "Entender meu corpo",
                 icone = "\uD83E\uDEC2",
                 selecionado = objetivoSelecionado == "Entender meu corpo",
                 onClick = { objetivoSelecionado = "Entender meu corpo" }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ObjetivoCard(
+                titulo = "Melhorar meu bem-estar",
+                icone = "\uD83C\uDF3F",
+                selecionado = objetivoSelecionado == "Melhorar meu bem-estar",
+                onClick = { objetivoSelecionado = "Melhorar meu bem-estar" }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
